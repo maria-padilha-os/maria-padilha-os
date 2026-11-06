@@ -1,0 +1,85 @@
+# Packages installed into the Maria Padilha live root.
+# Build-only tooling stays in the throw-away Arch container; only runtime
+# packages belong here. build.sh keeps the compiler toolchain out of the ISO.
+
+# Base system and archiso boot support
+base
+linux
+linux-firmware
+intel-ucode
+amd-ucode
+mkinitcpio-archiso
+squashfs-tools
+syslinux
+zstd
+
+# Live user, installer helpers and diagnostics
+sudo
+arch-install-scripts
+parted
+gptfdisk
+e2fsprogs
+dosfstools
+
+# Networking and Bluetooth
+networkmanager
+network-manager-applet
+wpa_supplicant
+wireless-regdb
+iw
+bluez
+bluez-utils
+
+# Audio
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+alsa-utils
+pavucontrol
+
+# Hyprland, Quickshell and the Maria Padilha session
+hyprland
+quickshell
+qt6-base
+qt6-declarative
+qt6-wayland
+qt6-svg
+xdg-desktop-portal
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+xdg-utils
+xdg-user-dirs
+polkit
+polkit-gnome
+gnome-keyring
+gsettings-desktop-schemas
+hyprlock
+hypridle
+hyprsunset
+playerctl
+grim
+slurp
+swappy
+wl-clipboard
+cliphist
+fuzzel
+brightnessctl
+trash-cli
+jq
+micro
+
+# Fonts used by the Quickshell bar, terminals and the Hyprland UI
+ttf-jetbrains-mono-nerd
+ttf-nerd-fonts-symbols
+noto-fonts
+noto-fonts-emoji
+otf-font-awesome
+ttf-dejavu
+
+# Display manager: greetd + tuigreet (the only greeter this profile supports)
+greetd
+greetd-tuigreet
+
+# The desktop package, served from the local repository build.sh creates.
+maria-padilha

@@ -1,0 +1,7 @@
+Maria Padilha live desktop
+
+The graphical session starts automatically as the unprivileged maria user.
+Log out to return to the greetd/tuigreet login screen. Run sudo for installer
+or recovery commands. The live ISO is ephemeral: changes are lost on reboot.
+
+Package: maria-padilha
