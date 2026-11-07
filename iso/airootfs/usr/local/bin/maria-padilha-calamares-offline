@@ -1,0 +1,42 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Prepare the installed target's pacman for the ISO-local package repository.
+# Calamares runs this in the target chroot before the packages module.
+#
+# The repository lives inside the unpacked target root, so file:// is enough;
+# no network, block device or remote mirror is involved.
+
+set -eu
+
+repo="/var/cache/calamares/offline-repo"
+db=""
+for candidate in \
+    "$repo/maria-padilha-offline.db" \
+    "$repo/maria-padilha-offline.db.tar.gz"
+do
+    if [ -f "$candidate" ]; then
+        db="$candidate"
+        break
+    fi
+done
+
+if [ -z "$db" ]; then
+    # A build without optional packages is still valid; there is simply
+    # nothing to add to pacman.
+    exit 0
+fi
+
+install -d -m 0755 /var/lib/pacman/sync
+ln -sfn "$db" /var/lib/pacman/sync/maria-padilha-offline.db
+
+if ! grep -q '^\[maria-padilha-offline\]$' /etc/pacman.conf 2>/dev/null; then
+    cat >>/etc/pacman.conf <<'EOF'
+
+[maria-padilha-offline]
+SigLevel = Optional DatabaseOptional
+Server = file:///var/cache/calamares/offline-repo
+EOF
+fi
+
+exit 0

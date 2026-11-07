@@ -10,4 +10,10 @@ else
   echo "ok no obvious tracked secret"
 fi
 rm -f /tmp/secret-scan.$$
+if bash tests/calamares.sh; then
+  echo "ok tests/calamares.sh"
+else
+  echo "FAIL tests/calamares.sh"
+  fail=1
+fi
 [ "$fail" -eq 0 ]
