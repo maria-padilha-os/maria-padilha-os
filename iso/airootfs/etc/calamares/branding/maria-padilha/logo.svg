@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Maria Padilha candle mark">
+  <rect width="256" height="256" rx="56" fill="#120807"/>
+  <circle cx="128" cy="128" r="92" fill="none" stroke="#b12e1b" stroke-width="8"/>
+  <rect x="98" y="112" width="60" height="88" rx="8" fill="#f3e6da"/>
+  <rect x="98" y="112" width="60" height="10" rx="4" fill="#d8a24a"/>
+  <line x1="128" y1="112" x2="128" y2="92" stroke="#d8a24a" stroke-width="5" stroke-linecap="round"/>
+  <path d="M128 42 C150 70 166 82 166 104 C166 128 150 144 128 144 C106 144 90 128 90 104 C90 82 106 70 128 42 Z" fill="#d8a24a"/>
+  <path d="M128 66 C140 84 150 92 150 106 C150 120 140 130 128 130 C116 130 106 120 106 106 C106 92 116 84 128 66 Z" fill="#b12e1b"/>
+  <ellipse cx="128" cy="206" rx="34" ry="5" fill="#2a1310"/>
+</svg>

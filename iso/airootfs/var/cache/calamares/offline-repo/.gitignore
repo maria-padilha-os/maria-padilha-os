@@ -1,0 +1,4 @@
+# Build artifacts for the offline Calamares repository.
+*
+!.gitignore
+!README.md

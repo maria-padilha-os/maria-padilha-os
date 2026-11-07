@@ -10,10 +10,37 @@ the tracked configs live in
 
 ## Status
 
-**Archiso scaffold.** The profile, package selection, live user, greetd/tuigreet
-setup and build wrapper are in place. There is no Calamares installer, signed
-release pipeline or QEMU smoke test yet. Do not install this on a host, and do
-not treat an untested local build as a release.
+**Archiso scaffold + Calamares configuration.** The profile, package selection,
+live user, greetd/tuigreet setup and build wrapper are in place, and the offline
+installer layer is under `iso/airootfs/etc/calamares/`: Calamares modules,
+Maria Padilha branding, an ISO-local package repository and a manual QEMU
+checklist. No bootable ISO has been built and **no full install has been run**.
+Do not install this on a host, and do not treat an untested local build as a
+release.
+
+## Calamares installer
+
+The installer is designed to work without a network: the target root comes from
+the ISO squashfs and extra packages come from the ISO-local pacman repository.
+See [docs/calamares.md](docs/calamares.md) for the design and
+[docs/qemu-calamares.md](docs/qemu-calamares.md) for the manual acceptance
+checklist.
+
+| path | role |
+| --- | --- |
+| `iso/airootfs/etc/calamares/settings.conf` | module sequence and branding choice |
+| `iso/airootfs/etc/calamares/modules/` | welcome, locale/timezone, keyboard, partition, user, packages and bootloader configs |
+| `iso/airootfs/etc/calamares/branding/maria-padilha/` | palette, local SVG art, stylesheet and slideshow |
+| `iso/airootfs/var/cache/calamares/offline-repo/` | build-time local package repository copied into the ISO |
+| `iso/calamares/` | live/offline package manifests and integration notes |
+| `scripts/calamares-offline-repo.sh` | stages and indexes the offline repository |
+| `tests/calamares.sh` | static config, branding and offline checks |
+
+Partitioning defaults to ext4. Encryption is disabled because this image does
+not carry the complete LUKS/GRUB/initramfs stack; enable it only after the image
+supports and tests encrypted root. The installer still needs to be built into
+an archiso profile and exercised with the QEMU checklist before it can be called
+tested.
 
 The static tests run anywhere. The ISO itself is only built inside an Arch
 container; `build.sh` refuses to run on a non-Arch host and outside a container.
@@ -136,7 +163,13 @@ real build.
 
 ## Known gaps
 
-- Calamares/offline installation is not wired yet.
+- A bootable ISO has not been built yet.
+- Calamares/offline installation is configured, but the QEMU acceptance
+  checklist has not been run.
 - No signed ISO, checksum publication or QEMU smoke test.
 - The live session is intentionally ephemeral and has an empty live-user
   password; do not reuse this configuration for an installed system.
+
+`tests/all.sh` runs both the archiso and Calamares static suites. The QEMU
+checklist is manual and must be run against a real ISO before claiming an
+install works.

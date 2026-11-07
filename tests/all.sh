@@ -16,4 +16,10 @@ else
   echo "FAIL tests/iso.sh"
   fail=1
 fi
+if bash tests/calamares.sh; then
+  echo "ok tests/calamares.sh"
+else
+  echo "FAIL tests/calamares.sh"
+  fail=1
+fi
 [ "$fail" -eq 0 ]

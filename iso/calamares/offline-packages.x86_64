@@ -1,0 +1,19 @@
+# Packages staged into the ISO-local repository for target installation.
+#
+# Keep this list aligned with:
+#   - the fixed operations in modules/packages.conf (grub, efibootmgr)
+#   - the default packagechooser item (maria-padilha)
+#   - the optional packagechooser groups (base-devel, git, neovim)
+#
+# The maria-padilha package is built from maria-padilha-de; pass the directory
+# containing the built archive to scripts/calamares-offline-repo.sh with
+# --package-dir.  Everything else can be downloaded on the build host.
+#
+# cryptsetup/LUKS is intentionally absent: modules/partition.conf disables
+# LUKS because the image does not carry the full encrypted-root stack.
+maria-padilha
+grub
+efibootmgr
+@base-devel
+git
+neovim

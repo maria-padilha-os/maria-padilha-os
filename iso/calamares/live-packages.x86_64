@@ -1,0 +1,6 @@
+# Packages appended to iso/packages.x86_64 for the live root.
+#
+# Calamares is a live-only tool; it must never be installed into the target.
+# Dependencies (ckbcomp, kpmcore, Qt 6, squashfs-tools, ...) are resolved by
+# pacman when the archiso build installs this list.
+calamares

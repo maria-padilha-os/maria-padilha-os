@@ -1,0 +1,78 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ *
+ * Maria Padilha palette: candle red #b12e1b, near-black #120807 and
+ * #1a0d0b, candle gold #d8a24a, cream #f3e6da and #fff7ef.
+ */
+
+QWidget {
+    color: #f3e6da;
+    background-color: #120807;
+}
+
+#sidebarApp {
+    background-color: #120807;
+}
+
+#sidebarApp QLabel {
+    color: #f3e6da;
+}
+
+#sidebarApp QListView {
+    background-color: #120807;
+    color: #f3e6da;
+    border: none;
+}
+
+#sidebarApp QListView::item:selected {
+    background-color: #b12e1b;
+    color: #fff7ef;
+}
+
+QPushButton {
+    background-color: #2a1310;
+    color: #f3e6da;
+    border: 1px solid #b12e1b;
+    border-radius: 4px;
+    padding: 6px 14px;
+}
+
+QPushButton:hover {
+    background-color: #b12e1b;
+    color: #fff7ef;
+}
+
+QPushButton:disabled {
+    background-color: #1a0d0b;
+    color: #8d7567;
+    border-color: #4a2a24;
+}
+
+QProgressBar {
+    background-color: #1a0d0b;
+    border: 1px solid #4a2a24;
+    border-radius: 3px;
+    text-align: center;
+    color: #fff7ef;
+}
+
+QProgressBar::chunk {
+    background-color: #b12e1b;
+}
+
+QLineEdit, QComboBox, QSpinBox, QTextEdit {
+    background-color: #1a0d0b;
+    color: #fff7ef;
+    border: 1px solid #4a2a24;
+    border-radius: 4px;
+    padding: 4px;
+}
+
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QTextEdit:focus {
+    border-color: #d8a24a;
+}
+
+QToolTip {
+    background-color: #1a0d0b;
+    color: #f3e6da;
+    border: 1px solid #d8a24a;
+}

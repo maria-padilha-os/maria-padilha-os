@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Maria Padilha Calamares branding.  The palette is derived from the desktop's
+# candle-red seed (#b12e1b) and its black/cream surfaces; every image below is
+# a file in this directory.  No remote image or font is referenced.
+---
+componentName: maria-padilha
+
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+
+windowExpanding: normal
+windowSize: 900px,600px
+windowPlacement: center
+
+sidebar: widget
+navigation: widget
+
+strings:
+    productName:         "Maria Padilha OS"
+    shortProductName:    "Maria Padilha"
+    version:             "0.1"
+    shortVersion:        "0.1"
+    versionedName:       "Maria Padilha OS 0.1"
+    shortVersionedName:  "Maria Padilha 0.1"
+    bootloaderEntryName: "Maria Padilha"
+    productUrl:          "https://github.com/maria-padilha-os"
+    supportUrl:          "https://github.com/maria-padilha-os/maria-padilha-os/issues"
+    knownIssuesUrl:      "https://github.com/maria-padilha-os/maria-padilha-os/issues"
+    releaseNotesUrl:     "https://github.com/maria-padilha-os/maria-padilha-os"
+    donateUrl:           "https://github.com/sponsors/maria-padilha-os"
+
+images:
+    productIcon:     "logo.svg"
+    productLogo:     "logo.svg"
+    productWelcome:  "welcome.svg"
+
+style:
+    SidebarBackground:        "#120807"
+    SidebarText:              "#f3e6da"
+    SidebarBackgroundCurrent: "#b12e1b"
+    SidebarTextCurrent:       "#fff7ef"
+
+slideshow: "show.qml"
+slideshowAPI: 2
+
+uploadServer:
+    type: "none"
