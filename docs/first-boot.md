@@ -39,6 +39,13 @@ enabled where the package is present and the service is available, but it must
 not conflict with another power manager: this image does not install TLP,
 auto-cpufreq or similar.
 
+The laptop policy disables suspend and hibernation entirely because s2idle is
+known broken on the reference AMD machine. `sleep.conf.d` disables the sleep
+states and `logind.conf.d` ignores the lid switch, sleep keys and idle action;
+no idle timer enables automatic suspend. See
+[supported-hardware.md](supported-hardware.md) for the hardware classes and the
+read-only `maria-padilha-hardware-check` command.
+
 ## PipeWire user services
 
 PipeWire is a user-session service stack, not a system service. Global user
@@ -228,6 +235,11 @@ prove that a GPU, Bluetooth adapter or compositor works. Use the QEMU checklist
 for that. Pass `--run-daylight` only when inspecting the running system; the
 default chroot check does not execute a GUI command.
 
+Hardware package and firmware presence are checked separately by
+`maria-padilha-hardware-check` (or `bash scripts/check-hardware.sh --root /mnt`).
+That check is read-only, does not need root and never exercises suspend or
+hibernation; see [supported-hardware.md](supported-hardware.md).
+
 ## Known limits
 
 - The ISO and the installed system have not been built or booted in this
@@ -239,3 +251,6 @@ default chroot check does not execute a GUI command.
   `/etc/skel` still has the shell setup but not the full desktop config.
 - `power-profiles-daemon` is enabled as the single power manager. Do not add a
   conflicting daemon without adjusting the service policy and tests.
+- s2idle suspend and hibernation are unsupported on the reference laptop and
+  are disabled in `sleep.conf.d`. Do not treat a suspend/resume test as part of
+  this image's acceptance suite.

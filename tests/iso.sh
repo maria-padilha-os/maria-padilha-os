@@ -39,28 +39,38 @@ for file in \
     iso/airootfs/usr/local/bin/maria-padilha-greeter \
     iso/airootfs/usr/share/plymouth/themes/maria-padilha/maria-padilha.plymouth \
     iso/airootfs/boot/grub/themes/maria-padilha/theme.txt \
+    iso/airootfs/usr/local/bin/maria-padilha-hardware-check \
+    iso/airootfs/etc/systemd/sleep.conf.d/10-maria-padilha-no-s2idle.conf \
+    iso/airootfs/etc/systemd/logind.conf.d/10-maria-padilha-no-autosuspend.conf \
     iso/efiboot/loader/entries/01-maria-padilha-linux.conf \
     iso/syslinux/syslinux.cfg \
     iso/syslinux/archiso_sys.cfg \
     iso/syslinux/splash.png \
     scripts/overlay-dotfiles.sh \
+    scripts/check-hardware.sh \
     tests/first-boot.sh \
     tests/skel.sh \
     tests/branding.sh \
     docs/first-boot.md \
     docs/boot-branding.md \
-    docs/qemu-branding.md; do
+    docs/qemu-branding.md \
+    tests/hardware.sh \
+    docs/supported-hardware.md; do
     require_file "$file"
 done
 
 for executable in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.sh \
     tests/branding.sh scripts/overlay-dotfiles.sh iso/profiledef.sh \
-    iso/airootfs/usr/local/bin/maria-padilha-greeter; do
+    iso/airootfs/usr/local/bin/maria-padilha-greeter \
+    tests/hardware.sh scripts/check-hardware.sh \
+    iso/airootfs/usr/local/bin/maria-padilha-hardware-check; do
     require_exec "$executable"
 done
 
 for script in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.sh \
-    tests/branding.sh scripts/overlay-dotfiles.sh iso/profiledef.sh; do
+    tests/branding.sh scripts/overlay-dotfiles.sh iso/profiledef.sh \
+    tests/hardware.sh scripts/check-hardware.sh \
+    iso/airootfs/usr/local/bin/maria-padilha-hardware-check; do
     if bash -n "$script" 2>/dev/null; then
         ok "$script syntax"
     else
@@ -139,7 +149,25 @@ has_pkg() {
 required_packages=(
     base
     linux
+    amd-ucode
     linux-firmware
+    linux-firmware-amd
+    linux-firmware-amdgpu
+    linux-firmware-atheros
+    linux-firmware-broadcom
+    linux-firmware-intel
+    linux-firmware-mediatek
+    linux-firmware-realtek
+    mesa
+    vulkan-radeon
+    libva
+    sof-firmware
+    alsa-ucm-conf
+    upower
+    lm_sensors
+    acpi
+    pciutils
+    usbutils
     mkinitcpio-archiso
     squashfs-tools
     syslinux
@@ -310,6 +338,11 @@ if grep -qF -- 'docs/qemu-branding.md' README.md &&
     ok "README links the boot-branding design and QEMU checklist"
 else
     bad "README does not link the boot-branding docs"
+fi
+if grep -qF -- 'tests/hardware.sh' tests/all.sh; then
+    ok "repository suite runs the hardware test"
+else
+    bad "repository suite is missing the hardware test"
 fi
 if grep -qE '^first-boot:' Makefile; then
     ok "Makefile has a first-boot target"

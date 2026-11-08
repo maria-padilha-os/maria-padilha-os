@@ -40,4 +40,10 @@ else
   echo "FAIL tests/first-boot.sh --profile"
   fail=1
 fi
+if bash tests/hardware.sh; then
+  echo "ok tests/hardware.sh"
+else
+  echo "FAIL tests/hardware.sh"
+  fail=1
+fi
 [ "$fail" -eq 0 ]

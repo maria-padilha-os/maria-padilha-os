@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: all test iso package prereqs first-boot clean
+.PHONY: all test iso package prereqs first-boot hardware-check clean
 
 all: test
 
@@ -30,6 +30,10 @@ prereqs:
 # inside the target chroot/nspawn, or pass ROOT=/mnt from the build host.
 first-boot:
 	bash tests/first-boot.sh --root "$${ROOT:-/}"
+
+# Read-only hardware enablement check for the running image or ROOT=/mnt.
+hardware-check:
+	bash scripts/check-hardware.sh --root "$${ROOT:-/}"
 
 clean:
 	rm -rf out .scratch/iso-build

@@ -35,4 +35,5 @@ file_permissions=(
   ["/etc/maria-padilha/boot-palette.conf"]="0:0:644"
   ["/etc/plymouth/plymouthd.conf"]="0:0:644"
   ["/usr/local/bin/maria-padilha-greeter"]="0:0:755"
+  ["/usr/local/bin/maria-padilha-hardware-check"]="0:0:755"
 )
