@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Maria Padilha GRUB theme for the installed target.  Calamares installs GRUB
+# for both UEFI and BIOS and writes GRUB_THEME in /etc/default/grub.  The
+# palette is the same candle-red set as Plymouth and the greeter; no external
+# pixmap, font file or artwork is referenced.  Font properties are deliberately
+# omitted so GRUB uses its own built-in unicode font; a missing distro font
+# must not make the menu unreadable.
+title-text: "Maria Padilha OS"
+title-color: "#f3e6da"
+desktop-image: "background.png"
+desktop-color: "#120807"
+terminal-left: "10%"
+terminal-top: "72%"
+terminal-width: "80%"
+terminal-height: "24%"
+terminal-border: "0"
+
++ boot_menu {
+    left = 16%
+    top = 28%
+    width = 68%
+    height = 44%
+    item_color = "#f3e6da"
+    selected_item_color = "#fff7ef"
+    item_height = 34
+    item_padding = 8
+    item_spacing = 4
+    icon_width = 0
+    icon_height = 0
+    scrollbar = false
+}
+
++ progress_bar {
+    id = "__timeout__"
+    left = 16%
+    top = 80%
+    width = 68%
+    height = 12
+    show_text = true
+    text_color = "#f3e6da"
+    fg_color = "#b12e1b"
+    bg_color = "#1a0d0b"
+    border_color = "#d8a24a"
+}

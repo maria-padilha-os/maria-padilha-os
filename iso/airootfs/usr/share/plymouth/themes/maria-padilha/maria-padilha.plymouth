@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[Plymouth Theme]
+Name=Maria Padilha
+Description=Maria Padilha candle boot splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/maria-padilha
+ScriptFile=/usr/share/plymouth/themes/maria-padilha/maria-padilha.script

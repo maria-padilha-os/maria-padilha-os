@@ -9,6 +9,7 @@ linux-firmware
 intel-ucode
 amd-ucode
 mkinitcpio-archiso
+plymouth
 squashfs-tools
 syslinux
 zstd

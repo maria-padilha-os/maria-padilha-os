@@ -10,8 +10,9 @@ the tracked configs live in
 
 ## Status
 
-**Archiso scaffold + Calamares configuration + first-boot provisioning.** The
-profile, package selection, live user, greetd/tuigreet setup, build wrapper and
+**Archiso scaffold + Calamares configuration + first-boot provisioning +
+boot/greeter branding.** The profile, package selection, live user,
+greetd/tuigreet setup, build wrapper, Plymouth theme, GRUB/syslinux menus and
 first-boot provisioning are in place. The latter enables NetworkManager,
 Bluetooth, seatd, greetd and power-profiles-daemon, enables the PipeWire user
 stack, and populates `/etc/skel` from the tracked dotfiles without copying
@@ -21,8 +22,11 @@ ISO-local package repository and a manual QEMU checklist. No bootable ISO has
 been built and **no full install has been run**. Do not install this on a host,
 and do not treat an untested local build as a release.
 
-See [docs/first-boot.md](docs/first-boot.md) for the service/skel design and the
-things that can only finish after the user's first graphical login.
+See [docs/first-boot.md](docs/first-boot.md) for the service/skel design,
+[docs/boot-branding.md](docs/boot-branding.md) for the boot/greeter palette and
+fallback design, and [docs/qemu-branding.md](docs/qemu-branding.md) for the
+manual visual checklist. The branding checks are static; they do not perform a
+graphical login.
 
 ## Calamares installer
 
@@ -51,6 +55,36 @@ tested.
 The static tests run anywhere. The ISO itself is only built inside an Arch
 container; `build.sh` refuses to run on a non-Arch host and outside a container.
 
+## Boot and greeter branding
+
+The firmware menu, Plymouth splash, installed GRUB menu and greetd login screen
+share one candle-red palette: `#120807` background, `#1a0d0b` surface,
+`#b12e1b` primary, `#d8a24a` gold, `#f3e6da` cream and `#fff7ef` bright cream.
+The static fallback lives in
+`iso/airootfs/etc/maria-padilha/boot-palette.conf`; the same values are baked
+into the Plymouth script because the splash runs before the root filesystem's
+palette can be read. The greeter wrapper reads the palette when present and
+falls back to the same readable red/gold/white theme when it is missing or
+malformed. No live graphical login is needed for the tests.
+
+| path | role |
+| --- | --- |
+| `iso/airootfs/usr/share/plymouth/themes/maria-padilha/` | local SVG/PNG candle splash, title, progress and theme script |
+| `iso/airootfs/etc/plymouth/plymouthd.conf` | selects the Maria Padilha theme |
+| `iso/airootfs/boot/grub/themes/maria-padilha/` | installed-target GRUB background and theme |
+| `iso/syslinux/archiso_head.cfg`, `iso/syslinux/splash.png` | BIOS live menu colours and background |
+| `iso/efiboot/loader/loader.conf` | text-only UEFI systemd-boot menu settings |
+| `iso/airootfs/usr/local/bin/maria-padilha-greeter` | tuigreet `--theme` wrapper with a no-palette fallback |
+| `iso/airootfs/etc/maria-padilha/boot-palette.conf` | palette data and derived tuigreet theme |
+| `tests/branding.sh` | static paths, PNG sizes, palette/fallback and wiring checks |
+| `docs/boot-branding.md` | design and fallback behaviour |
+| `docs/qemu-branding.md` | manual QEMU visual checklist |
+
+Plymouth is selected through the `plymouth` mkinitcpio hook, and both live and
+installed kernel command lines carry `splash`. The theme assets are original
+vector/text treatments rendered to PNG in this repository; no external artwork
+is downloaded or embedded.
+
 ## What the profile contains
 
 | path | role |
@@ -58,12 +92,15 @@ container; `build.sh` refuses to run on a non-Arch host and outside a container.
 | `iso/profiledef.sh` | archiso profile, boot modes and file permissions |
 | `iso/packages.x86_64` | live-root package list |
 | `iso/pacman.conf` | official repositories; `build.sh` appends the local package repository |
-| `iso/airootfs/` | live user, greetd config, enabled system/user units, `/etc/skel`, mkinitcpio config |
+| `iso/airootfs/` | live user, greetd config, enabled system/user units, `/etc/skel`, mkinitcpio config, Plymouth theme and boot palette |
 | `scripts/overlay-dotfiles.sh` | copies the tracked dotfiles into `/etc/skel`, excluding secrets |
 | `tests/first-boot.sh` | chroot/nspawn verifier for ownership, service enablement and secrets |
+| `tests/branding.sh` | static boot/greeter branding, PNG-size and palette-fallback checks |
 | `docs/first-boot.md` | first-login provisioning, limits and verification steps |
-| `iso/efiboot/` | UEFI systemd-boot entries |
-| `iso/syslinux/` | BIOS syslinux entries |
+| `docs/boot-branding.md` | boot/greeter palette design, fallback and kernel parameters |
+| `docs/qemu-branding.md` | manual QEMU visual checklist for boot and login |
+| `iso/efiboot/` | UEFI systemd-boot entries and menu settings |
+| `iso/syslinux/` | BIOS syslinux entries, menu palette and splash |
 | `build.sh` | builds `maria-padilha`, publishes it to `out/repo`, then runs `mkarchiso` |
 | `tests/iso.sh` | static profile, package, permission, version and secret checks |
 | `tests/skel.sh` | dotfiles-overlay fixture: allowlist, modes and secret rejection |
@@ -77,13 +114,18 @@ packages.
 
 **greetd + tuigreet**, not SDDM. The live image starts greetd on VT 1 and uses
 `initial_session` to enter the `maria` live account directly. Logging out drops
-back to `tuigreet`, which lists the Maria Padilha session installed by the
+back to `/usr/local/bin/maria-padilha-greeter`, which starts tuigreet with the
+Maria Padilha `--theme` spec and lists the session installed by the
 `maria-padilha` package at
 `/usr/share/wayland-sessions/maria-padilha.desktop`.
 
 The live account has no password and may use `sudo`; root is locked. The ISO is
 ephemeral. `iso/airootfs/etc/greetd/config.toml`,
-`iso/packages.x86_64` and the enabled `greetd.service` unit must stay in sync.
+`iso/airootfs/usr/local/bin/maria-padilha-greeter`, `iso/packages.x86_64` and
+the enabled `greetd.service` unit must stay in sync. The wrapper extracts the
+`--theme` value from `boot-palette.conf` with `sed` (it never executes the
+palette file) and uses a compiled-in red/gold/white fallback when the file is
+missing, unreadable or malformed.
 
 The same profile enables `seatd.service` and `power-profiles-daemon.service`
 for systems that use them, and links `NetworkManager`, `bluetooth`, `greetd`
@@ -161,6 +203,7 @@ checkout is present, `tests/iso.sh` fails if the pin and PKGBUILD disagree.
 ```sh
 bash tests/all.sh                     # full static suite
 make test                             # same
+bash tests/branding.sh                # boot/greeter paths, sizes and fallback
 bash tests/first-boot.sh --profile    # first-login checks against iso/airootfs
 make first-boot ROOT=/mnt             # inspect an installed root (read-only)
 ```
@@ -168,13 +211,17 @@ make first-boot ROOT=/mnt             # inspect an installed root (read-only)
 `tests/iso.sh` checks the profile files and version, required and forbidden
 package names, executable bits, system and user service enablement, the skel
 shell setup, greetd/session discovery, boot entries, the mkinitcpio archiso
-hook, no `.env`, and obvious API/private-key patterns. `tests/skel.sh` exercises
-the dotfiles overlay with a temporary fixture and proves that `env.local.lua`,
-credentials and key-shaped values never reach skel. `tests/first-boot.sh` can
-run inside a chroot/systemd-nspawn (or inspect a root with `--root`) and checks
-ownership, enabled units, the session/wallpaper defaults and secrets without
-changing anything. None of these tests require root, `mkarchiso`, a network or
-a graphical session; `make first-boot` only reads the target it is pointed at.
+hook, no `.env`, and obvious API/private-key patterns. `tests/branding.sh`
+checks the Plymouth theme wiring, PNG dimensions, syslinux/GRUB styling,
+`plymouth` package and hook, kernel `splash` parameters, the greeter wrapper,
+and the no-palette/malformed-palette fallback without starting a graphical
+session. `tests/skel.sh` exercises the dotfiles overlay with a temporary
+fixture and proves that `env.local.lua`, credentials and key-shaped values
+never reach skel. `tests/first-boot.sh` can run inside a
+chroot/systemd-nspawn (or inspect a root with `--root`) and checks ownership,
+enabled units, the session/wallpaper defaults and secrets without changing
+anything. None of these tests require root, `mkarchiso`, a network or a
+graphical session; `make first-boot` only reads the target it is pointed at.
 
 ## Host prerequisites
 
@@ -203,15 +250,23 @@ real build.
 - A bootable ISO has not been built yet.
 - Calamares/offline installation is configured, but the QEMU acceptance
   checklist has not been run, so first boot is not yet proven end to end.
+- The boot/greeter branding is statically verified only. The QEMU visual
+  checklist in [docs/qemu-branding.md](docs/qemu-branding.md) has not been run,
+  so the syslinux, Plymouth, GRUB and greeter screens are not yet visually
+  confirmed.
 - No signed ISO, checksum publication or QEMU smoke test.
 - The live session is intentionally ephemeral and has an empty live-user
   password; do not reuse this configuration for an installed system.
 - PipeWire, wallpaper/palette generation, the Quickshell process, keyring/polkit
   and Firefox theming finish only after the first graphical login; see
   [docs/first-boot.md](docs/first-boot.md).
+- The boot and greeter palette is a checked-in fallback derived from the same
+  candle-red seed; it is not rewritten automatically by the session palette
+  generator. Replace `/etc/maria-padilha/boot-palette.conf` when a generated
+  system palette is available.
 - A development build without the sibling dotfiles checkout has the shell
   setup but not the full tracked Hyprland/Quickshell configuration.
 
-`tests/all.sh` runs both the archiso and Calamares static suites. The QEMU
-checklist is manual and must be run against a real ISO before claiming an
-install works.
+`tests/all.sh` runs the archiso, Calamares, branding, skel and first-boot static
+suites. The QEMU checklists are manual and must be run against a real ISO before
+claiming an install or a boot/login screen works.

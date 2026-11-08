@@ -1,0 +1,155 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Maria Padilha Plymouth theme.  The palette is the same candle-red seed as
+# the desktop and the Calamares branding.  These constants are the fallback:
+# Plymouth runs from the initramfs, before /etc/maria-padilha/boot-palette.conf
+# or any shell-generated palette can be read.  Keep them aligned with
+# boot-palette.conf; tests/branding.sh checks the hex values and float triples.
+#
+#   background      #120807  (0.071, 0.031, 0.027)
+#   surface bottom  #1a0d0b  (0.102, 0.051, 0.043)
+#   primary red     #b12e1b  (0.694, 0.180, 0.106)
+#   candle gold     #d8a24a  (0.847, 0.635, 0.290)
+#   text cream      #f3e6da  (0.953, 0.902, 0.855)
+#   bright cream    #fff7ef  (1.000, 0.969, 0.937)
+#   muted brown     #8d7567  (0.553, 0.459, 0.404)
+
+Window.SetBackgroundTopColor(0.071, 0.031, 0.027);
+Window.SetBackgroundBottomColor(0.102, 0.051, 0.043);
+
+background_image = Image("background.png");
+background_sprite = Sprite();
+background_sprite.SetZ(-100);
+
+logo_image = Image("logo.png");
+logo_sprite = Sprite(logo_image);
+logo_sprite.SetZ(10);
+
+title_image = Image("title.png");
+title_sprite = Sprite(title_image);
+title_sprite.SetZ(11);
+
+progress_bg_image = Image("progress-bg.png");
+progress_bg_sprite = Sprite(progress_bg_image);
+progress_bg_sprite.SetZ(12);
+
+progress_fill_image = Image("progress-fill.png");
+progress_fill_sprite = Sprite(progress_fill_image);
+progress_fill_sprite.SetZ(13);
+progress_fill_sprite.SetOpacity(0);
+
+message_text = "Loading the live desktop";
+message_sprite = Sprite(Image.Text(message_text, 0.953, 0.902, 0.855, 1, "DejaVu Sans 12", "center"));
+message_sprite.SetZ(14);
+
+# Give the password sprite a valid (empty) image before the first layout call;
+# asking a sprite with no image for its width would break the whole theme.
+password_sprite = Sprite(Image.Text(" ", 0.953, 0.902, 0.855, 1, "DejaVu Sans 12", "center"));
+password_sprite.SetZ(15);
+password_sprite.SetOpacity(0);
+password_text = "";
+
+last_width = 0;
+last_height = 0;
+
+fun layout()
+{
+    width = Window.GetWidth();
+    height = Window.GetHeight();
+
+    # Plymouth can call the refresh hook before the display mode is known.
+    # Do not try to scale an image to zero; the window colours remain the
+    # readable fallback until the real mode arrives.
+    if (width < 1 || height < 1)
+    {
+        return;
+    }
+
+    if (width != last_width || height != last_height)
+    {
+        last_width = width;
+        last_height = height;
+
+        background_sprite.SetImage(background_image.Scale(width, height));
+        background_sprite.SetPosition(0, 0, -100);
+
+        logo_x = Math.Int(width / 2 - logo_image.GetWidth() / 2);
+        logo_y = Math.Int(height * 0.20);
+        logo_sprite.SetPosition(logo_x, logo_y, 10);
+
+        title_x = Math.Int(width / 2 - title_image.GetWidth() / 2);
+        title_y = logo_y + logo_image.GetHeight() + 18;
+        title_sprite.SetPosition(title_x, title_y, 11);
+
+        bar_width = progress_bg_image.GetWidth();
+        bar_x = Math.Int(width / 2 - bar_width / 2);
+        bar_y = Math.Int(height * 0.70);
+        progress_bg_sprite.SetPosition(bar_x, bar_y, 12);
+        progress_fill_sprite.SetPosition(bar_x, bar_y, 13);
+
+        message_x = Math.Int(width / 2 - message_sprite.GetImage().GetWidth() / 2);
+        message_y = Math.Int(height * 0.78);
+        message_sprite.SetPosition(message_x, message_y, 14);
+
+        password_x = Math.Int(width / 2 - password_sprite.GetImage().GetWidth() / 2);
+        password_y = Math.Int(height * 0.86);
+        password_sprite.SetPosition(password_x, password_y, 15);
+    }
+}
+
+layout();
+
+fun refresh_callback()
+{
+    layout();
+}
+Plymouth.SetRefreshFunction(refresh_callback);
+
+fun boot_progress_callback(time, progress)
+{
+    progress = Math.Clamp(progress, 0, 1);
+    width = Math.Int(progress_bg_image.GetWidth() * progress);
+    if (width < 1)
+    {
+        progress_fill_sprite.SetOpacity(0);
+    }
+    else
+    {
+        progress_fill_sprite.SetImage(progress_fill_image.Scale(width, progress_fill_image.GetHeight()));
+        progress_fill_sprite.SetOpacity(1);
+    }
+}
+Plymouth.SetBootProgressFunction(boot_progress_callback);
+
+fun message_callback(text)
+{
+    if (text == "" || text == 0)
+    {
+        text = "Loading the live desktop";
+    }
+    message_sprite.SetImage(Image.Text(text, 0.953, 0.902, 0.855, 1, "DejaVu Sans 12", "center"));
+    layout();
+}
+Plymouth.SetMessageFunction(message_callback);
+
+# A disk password, when present, is shown as a readable cream prompt with
+# gold bullets.  It never replaces the logo/progress fallback with a blank
+# screen.
+fun display_password_callback(prompt, bullets)
+{
+    password_text = prompt;
+    for (i = 0; i < bullets; i++)
+    {
+        password_text = password_text + " *";
+    }
+    password_sprite.SetImage(Image.Text(password_text, 0.953, 0.902, 0.855, 1, "DejaVu Sans 12", "center"));
+    password_sprite.SetOpacity(1);
+    layout();
+}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+fun display_normal_callback()
+{
+    password_sprite.SetOpacity(0);
+}
+Plymouth.SetDisplayNormalFunction(display_normal_callback);

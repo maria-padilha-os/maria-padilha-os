@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only
+     Plymouth title card.  The text is rendered to pixels at build time by the
+     repository maintainer, so the boot splash does not depend on a font
+     being present in the initramfs for the title. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="160" viewBox="0 0 760 160">
+  <text x="380" y="72" text-anchor="middle" fill="#f3e6da" font-family="DejaVu Sans, sans-serif" font-size="58" font-weight="700" letter-spacing="3">MARIA PADILHA</text>
+  <text x="380" y="118" text-anchor="middle" fill="#d8a24a" font-family="DejaVu Sans, sans-serif" font-size="19" letter-spacing="8">STARTING THE CANDLE</text>
+</svg>

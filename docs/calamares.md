@@ -38,7 +38,10 @@ installs the selected packages and the bootloader, then unmounts.
   encrypted-root stack (cryptsetup, LUKS-aware GRUB/initramfs support).
 - **Bootloader.**  GRUB is installed for UEFI and BIOS.  `grub` and
   `efibootmgr` are installed from the local repository before the bootloader
-  module runs.
+  module runs.  `grubcfg.conf` points `/etc/default/grub` at the repository's
+  `/boot/grub/themes/maria-padilha/theme.txt`, sets the candle-red GRUB
+  colours and writes `quiet splash`; GRUB's console fallback keeps the menu
+  usable if gfxterm cannot start.  See [boot-branding.md](boot-branding.md).
 - **User.**  One user with `wheel` sudo rights, a separate root password, no
   autologin.  The preceding `shellprocess` job removes the passwordless live
   `maria` account, its sudo rule and the live greetd autologin before this
@@ -92,6 +95,12 @@ surfaces `#120807` / `#1a0d0b`, candle gold `#d8a24a` and cream `#f3e6da` /
 `#fff7ef`.  `logo.svg`, `welcome.svg`, `stylesheet.qss` and `show.qml` are all
 files in this repository; no remote image, font or stylesheet is referenced by
 the branding component.
+
+The same palette continues outside Calamares: the Plymouth theme, syslinux
+menu, installed GRUB theme and greetd wrapper all use it, with a checked-in
+fallback for the pre-session boot path.  See [boot-branding.md](boot-branding.md)
+for the paths, fallback behaviour and the manual
+[QEMU visual checklist](qemu-branding.md).
 
 ## Testing
 

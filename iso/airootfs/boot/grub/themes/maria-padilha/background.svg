@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only
+     GRUB boot menu background installed with the target GRUB theme. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#120807"/>
+      <stop offset="0.58" stop-color="#1a0d0b"/>
+      <stop offset="1" stop-color="#120807"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="55%">
+      <stop offset="0" stop-color="#b12e1b" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#120807" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#glow)"/>
+  <circle cx="960" cy="430" r="310" fill="none" stroke="#b12e1b" stroke-opacity="0.22" stroke-width="2"/>
+  <circle cx="960" cy="430" r="410" fill="none" stroke="#d8a24a" stroke-opacity="0.10" stroke-width="2"/>
+  <path d="M0 930 C340 860 620 970 960 930 C1300 890 1580 860 1920 930 L1920 1080 L0 1080 Z" fill="#120807" fill-opacity="0.6"/>
+</svg>

@@ -1,0 +1,52 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Start tuigreet with the Maria Padilha palette.
+#
+# tuigreet can only use ANSI colours on the Linux console, so the palette file
+# carries a derived --theme spec next to the hex colours used by the other
+# boot layers.  The greeter runs before any user session exists, therefore it
+# must not depend on the shell having generated a palette: if the file is
+# missing or has no usable theme, the compiled-in fallback below is used.
+#
+# This script only reads data.  It does not run sudo, pkexec, systemctl or any
+# other privileged command; greetd starts it as the unprivileged greeter user.
+
+set -u
+
+palette_file="${MARIA_PADILHA_PALETTE:-/etc/maria-padilha/boot-palette.conf}"
+fallback_theme='container=black;border=red;title=yellow;text=white;time=yellow;greet=white;prompt=red;input=white;action=yellow;button=white'
+theme="$fallback_theme"
+
+if [ -f "$palette_file" ] && [ -r "$palette_file" ]; then
+    # Extract only the one data assignment.  Do not source or execute the
+    # palette file: a broken palette must not break login.
+    palette_theme="$(
+        sed -n \
+            -e 's/^[[:space:]]*MARIA_PADILHA_GREETER_THEME[[:space:]]*=[[:space:]]*"\([^"]*\)"[[:space:]]*$/\1/p' \
+            -e "s/^[[:space:]]*MARIA_PADILHA_GREETER_THEME[[:space:]]*=[[:space:]]*'\([^']*\)'[[:space:]]*$/\\1/p" \
+            "$palette_file" 2>/dev/null | tail -n 1
+    )" || palette_theme=""
+    if [ -n "$palette_theme" ]; then
+        theme="$palette_theme"
+    fi
+fi
+
+# File-level checks use this mode; it never starts or touches a graphical
+# session.  Keep it before the tuigreet exec so the test needs no login.
+if [ "${1:-}" = "--print-theme" ]; then
+    printf '%s\n' "$theme"
+    exit 0
+fi
+
+if [ "$#" -eq 0 ]; then
+    set -- --sessions /usr/share/wayland-sessions --greeting "Maria Padilha"
+fi
+
+# --remember* needs /var/cache/tuigreet, created by tmpfiles.d/tuigreet.conf.
+exec tuigreet \
+    --time \
+    --remember \
+    --remember-user-session \
+    --theme "$theme" \
+    "$@"

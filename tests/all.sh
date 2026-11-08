@@ -22,6 +22,12 @@ else
   echo "FAIL tests/calamares.sh"
   fail=1
 fi
+if bash tests/branding.sh; then
+  echo "ok tests/branding.sh"
+else
+  echo "FAIL tests/branding.sh"
+  fail=1
+fi
 if bash tests/skel.sh; then
   echo "ok tests/skel.sh"
 else

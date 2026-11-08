@@ -249,6 +249,22 @@ if bootloader.get("efiBootLoader") not in ("grub", "systemd-boot"):
 for key in ("grubInstall", "grubMkconfig", "grubCfg", "efiBootMgr"):
     if not bootloader.get(key):
         raise AssertionError(f"bootloader.conf is missing {key}")
+if "splash" not in (bootloader.get("kernelParams") or []):
+    raise AssertionError("bootloader.conf kernelParams is missing splash")
+if not any("console-mode max" in str(entry) for entry in (bootloader.get("loaderEntries") or [])):
+    raise AssertionError("bootloader.conf loaderEntries is missing console-mode max")
+
+grubcfg = load(modules / "grubcfg.conf")
+if "splash" not in (grubcfg.get("kernel_params") or []):
+    raise AssertionError("grubcfg.conf kernel_params is missing splash")
+grub_defaults = grubcfg.get("defaults") or {}
+theme_path = grub_defaults.get("GRUB_THEME")
+if theme_path != "/boot/grub/themes/maria-padilha/theme.txt":
+    raise AssertionError("grubcfg.conf does not select the Maria Padilha GRUB theme")
+if not (root / "iso/airootfs" / theme_path.lstrip("/")).is_file():
+    raise AssertionError(f"GRUB theme file is missing: {theme_path}")
+if grub_defaults.get("GRUB_TERMINAL_OUTPUT") == "console":
+    raise AssertionError("grubcfg.conf pins GRUB to console and would hide the theme")
 
 branding = load(brand / "branding.desc")
 if branding.get("componentName") != "maria-padilha":
