@@ -94,7 +94,12 @@ systemctl --user is-enabled pipewire pipewire-pulse wireplumber
 test -f /usr/share/wayland-sessions/maria-padilha.desktop
 padilha-daylight --dry-run
 ls ~/.local/state/padilha/wallpaper
+maria-padilha-hardware-check
 ```
+
+The hardware check is read-only.  It must not ask for a password and must not
+perform a suspend or hibernate test.  Record any `FAIL`/`SKIP` line instead of
+working around it.
 
 15. In the guest, check the installed system:
 

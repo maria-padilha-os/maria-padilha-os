@@ -5,13 +5,31 @@
 # Base system and archiso boot support
 base
 linux
-linux-firmware
-intel-ucode
-amd-ucode
 mkinitcpio-archiso
 squashfs-tools
 syslinux
 zstd
+
+# CPU microcode and firmware. linux-firmware is the Arch meta package; the
+# vendor splits document the hardware classes the reference laptop needs.
+# Keep this a class list, not a per-model quirk list: AMD CPU/GPU, the common
+# Wi-Fi/Bluetooth vendors, and Intel fallback for best-effort hardware.
+amd-ucode
+intel-ucode
+linux-firmware
+linux-firmware-amd
+linux-firmware-amdgpu
+linux-firmware-atheros
+linux-firmware-broadcom
+linux-firmware-intel
+linux-firmware-mediatek
+linux-firmware-realtek
+
+# Graphics: the AMD Radeon user-space stack beside the amdgpu firmware above.
+mesa
+vulkan-radeon
+libva
+libva-utils
 
 # Live user, installer helpers and diagnostics
 sudo
@@ -30,16 +48,26 @@ iw
 bluez
 bluez-utils
 
-# Session services: seats, power profiles and the user audio stack
+# Session services: seats, power/thermal reporting and the user audio stack.
+# power-profiles-daemon is the single power manager; TLP, auto-cpufreq and
+# thermald are intentionally absent so they cannot fight it.
 seatd
 power-profiles-daemon
+upower
+lm_sensors
+acpi
+pciutils
+usbutils
 
-# Audio
+# Audio, including Sound Open Firmware and the ALSA UCM profiles used by
+# modern AMD laptop codecs.
 pipewire
 pipewire-pulse
 pipewire-alsa
 wireplumber
 alsa-utils
+alsa-ucm-conf
+sof-firmware
 pavucontrol
 
 # Hyprland, Quickshell and the Maria Padilha session

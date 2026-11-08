@@ -81,6 +81,11 @@ an optional development group; both are resolved from the same local
 repository.  Keep the manifest, the fixed `packages.conf` operations and the
 packagechooser groups aligned when changing package selection.
 
+Laptop hardware support is not a packagechooser group.  Microcode, firmware,
+audio and power/thermal packages are in `iso/packages.x86_64`, so they arrive
+in the target through the live squashfs and are available on the first offline
+boot.  See [supported-hardware.md](supported-hardware.md).
+
 The repository is deliberately retained in the target so `pacman` can install
 from it later without a network.  Add or remove packages by rebuilding the ISO,
 not by deleting the directory at install time.

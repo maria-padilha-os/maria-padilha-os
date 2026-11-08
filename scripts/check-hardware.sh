@@ -1,0 +1,1 @@
+../iso/airootfs/usr/local/bin/maria-padilha-hardware-check

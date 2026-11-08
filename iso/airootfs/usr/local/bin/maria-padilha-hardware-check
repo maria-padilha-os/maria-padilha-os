@@ -1,0 +1,311 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Read-only hardware enablement check for a running Maria Padilha image.
+#
+# It verifies that the package and firmware classes the reference AMD laptop
+# needs are present, that the audio stack and power/thermal tools are installed,
+# and that the image policy still disables automatic suspend.  It does not
+# change the system, load modules, query the network, or exercise suspend and
+# hibernation.  Run it as the normal user:
+#
+#   maria-padilha-hardware-check
+#   maria-padilha-hardware-check --root /mnt
+set -Eeuo pipefail
+
+script_name="${0##*/}"
+target_root="/"
+verbose=0
+fail=0
+
+usage() {
+    cat <<EOF
+usage: $script_name [--root DIR] [--verbose]
+
+Check an installed/running Maria Padilha image for laptop hardware support.
+The check is read-only and needs no root.
+
+options:
+  --root DIR     inspect DIR instead of / (for example a mounted target)
+  --verbose      print extra runtime details
+  -h, --help     show this help
+
+Exit status is 0 when every required package, firmware tree, audio component
+and power policy is present.  Runtime suspend/hibernate is never tested; the
+configuration is checked instead.
+EOF
+}
+
+while (($#)); do
+    case "$1" in
+        --root)
+            (($# >= 2)) || { printf 'error: --root needs a path\n' >&2; exit 2; }
+            target_root="$2"
+            shift 2
+            ;;
+        --verbose)
+            verbose=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            printf 'error: unknown argument: %s (try --help)\n' "$1" >&2
+            exit 2
+            ;;
+    esac
+done
+(($# == 0)) || { printf 'error: unexpected argument: %s\n' "$1" >&2; exit 2; }
+
+[[ -d "$target_root" ]] || { printf 'error: root is not a directory: %s\n' "$target_root" >&2; exit 2; }
+target_root="$(realpath -- "$target_root")"
+root_prefix="${target_root%/}"
+
+ok() { printf 'ok %s\n' "$*"; }
+bad() { printf 'FAIL %s\n' "$*"; fail=1; }
+skip() { printf 'SKIP %s\n' "$*"; }
+info() { if ((verbose)); then printf '  %s\n' "$*"; fi; }
+
+# Absolute path inside the inspected root.  target_root="/" becomes "/etc/...".
+r() { printf '%s%s' "$root_prefix" "$1"; }
+
+pkg_db="$(r /var/lib/pacman/local)"
+
+have_pkg() {
+    local name="$1"
+    compgen -G "$pkg_db/$name-[0-9]*" >/dev/null 2>&1
+}
+
+require_pkg() {
+    local name="$1"
+    if [[ ! -d "$pkg_db" ]]; then
+        skip "package $name (no package database at ${pkg_db#"$root_prefix"})"
+        return
+    fi
+    if have_pkg "$name"; then
+        ok "package $name"
+    else
+        bad "package $name is not installed"
+    fi
+}
+
+require_pkg_any() {
+    local label="$1" package
+    shift
+    if [[ ! -d "$pkg_db" ]]; then
+        skip "$label (no package database at ${pkg_db#"$root_prefix"})"
+        return
+    fi
+    for package in "$@"; do
+        if have_pkg "$package"; then
+            ok "$label ($package)"
+            return
+        fi
+    done
+    bad "$label: none of these packages are installed: $*"
+}
+
+require_exec() {
+    local rel="$1"
+    if [[ -x "$(r "$rel")" ]]; then
+        ok "command $rel"
+    else
+        bad "command $rel is missing or not executable"
+    fi
+}
+
+require_dir() {
+    local rel="$1" label="${2:-$1}"
+    if [[ -d "$(r "$rel")" ]]; then
+        ok "$label"
+    else
+        bad "$label is missing at $rel"
+    fi
+}
+
+require_file() {
+    local rel="$1" label="${2:-$1}"
+    if [[ -s "$(r "$rel")" ]]; then
+        ok "$label"
+    else
+        bad "$label is missing or empty at $rel"
+    fi
+}
+
+require_symlink() {
+    local rel="$1" expected="$2" path actual
+    path="$(r "$rel")"
+    if [[ ! -L "$path" ]]; then
+        bad "${rel#/} is not an enabled symlink"
+        return
+    fi
+    actual="$(readlink -- "$path")"
+    if [[ "${actual##*/}" == "$expected" ]]; then
+        ok "${rel#/} -> $actual"
+    else
+        bad "${rel#/} points at '$actual', expected '$expected'"
+    fi
+}
+
+# A directory that contains at least one entry, for firmware trees.
+fw_dir_nonempty() {
+    local rel="$1"
+    [[ -n "$fw_root" ]] || return 1
+    [[ -d "$(r "$fw_root/$rel")" ]] || return 1
+    compgen -G "$(r "$fw_root/$rel")/*" >/dev/null 2>&1
+}
+
+check_fw_any() {
+    local label="$1" rel
+    shift
+    for rel in "$@"; do
+        if fw_dir_nonempty "$rel"; then
+            ok "$label ($fw_root/$rel)"
+            return
+        fi
+    done
+    bad "$label: no matching firmware tree under ${fw_root:-/usr/lib/firmware}"
+}
+
+# Look for a setting in a file or every *.conf below a drop-in directory.
+check_setting() {
+    local label="$1" pattern="$2" path
+    shift 2
+    for path in "$@"; do
+        [[ -e "$(r "$path")" ]] || continue
+        if grep -RhsE -- "$pattern" "$(r "$path")" 2>/dev/null | grep -q .; then
+            ok "$label"
+            return
+        fi
+    done
+    bad "$label"
+}
+
+printf '== packages: kernel, microcode and laptop support ==\n'
+require_pkg linux
+require_pkg amd-ucode
+require_pkg_any "firmware meta or AMD split" linux-firmware linux-firmware-amd linux-firmware-amdgpu
+require_pkg_any "Wi-Fi/Bluetooth firmware" \
+    linux-firmware-mediatek linux-firmware-realtek linux-firmware-atheros \
+    linux-firmware-broadcom linux-firmware-intel linux-firmware
+require_pkg sof-firmware
+require_pkg alsa-ucm-conf
+require_pkg power-profiles-daemon
+require_pkg upower
+require_pkg lm_sensors
+require_pkg acpi
+
+require_pkg networkmanager
+require_pkg bluez
+require_pkg bluez-utils
+require_pkg iw
+require_pkg wireless-regdb
+
+printf '\n== graphics and firmware trees ==\n'
+require_pkg mesa
+require_pkg vulkan-radeon
+require_pkg libva
+
+fw_root=""
+for candidate in /usr/lib/firmware /lib/firmware; do
+    if [[ -d "$(r "$candidate")" ]]; then
+        fw_root="$candidate"
+        break
+    fi
+done
+
+if [[ -n "$fw_root" ]]; then
+    ok "firmware root $fw_root"
+else
+    bad "no firmware root (/usr/lib/firmware or /lib/firmware)"
+fi
+
+if fw_dir_nonempty amdgpu; then
+    ok "AMD GPU firmware tree ($fw_root/amdgpu)"
+else
+    bad "AMD GPU firmware tree is missing or empty ($fw_root/amdgpu)"
+fi
+
+if fw_dir_nonempty amd; then
+    ok "AMD platform firmware tree ($fw_root/amd)"
+else
+    info "no AMD platform firmware directory; amd-ucode still covers CPU microcode"
+fi
+
+check_fw_any "Wi-Fi/Bluetooth firmware" \
+    mediatek rtw88 rtw89 rtlwifi rtl_bt ath10k ath11k ath12k ath6k ath9k_htc brcm intel iwlwifi
+
+check_fw_any "Sound Open Firmware" amd/sof intel/sof mediatek/sof sof
+
+printf '\n== audio ==\n'
+require_pkg pipewire
+require_pkg pipewire-pulse
+require_pkg pipewire-alsa
+require_pkg wireplumber
+require_pkg alsa-utils
+require_exec /usr/bin/pipewire
+require_exec /usr/bin/wireplumber
+require_exec /usr/bin/wpctl
+require_dir /usr/share/alsa/ucm2 "ALSA UCM profiles"
+
+printf '\n== power, thermal and services ==\n'
+require_exec /usr/bin/powerprofilesctl
+require_exec /usr/bin/sensors
+require_symlink /etc/systemd/system/multi-user.target.wants/power-profiles-daemon.service power-profiles-daemon.service
+require_symlink /etc/systemd/system/multi-user.target.wants/NetworkManager.service NetworkManager.service
+require_symlink /etc/systemd/system/multi-user.target.wants/bluetooth.service bluetooth.service
+
+check_setting "automatic suspend disabled (AllowSuspend=no)" \
+    '^[[:space:]]*AllowSuspend[[:space:]]*=[[:space:]]*no([[:space:]]|$)' \
+    /etc/systemd/sleep.conf.d /etc/systemd/sleep.conf
+check_setting "hibernation disabled (AllowHibernation=no)" \
+    '^[[:space:]]*AllowHibernation[[:space:]]*=[[:space:]]*no([[:space:]]|$)' \
+    /etc/systemd/sleep.conf.d /etc/systemd/sleep.conf
+check_setting "lid switch does not auto-suspend (HandleLidSwitch=ignore)" \
+    '^[[:space:]]*HandleLidSwitch[[:space:]]*=[[:space:]]*ignore([[:space:]]|$)' \
+    /etc/systemd/logind.conf.d /etc/systemd/logind.conf
+check_setting "idle action does not auto-suspend (IdleAction=ignore)" \
+    '^[[:space:]]*IdleAction[[:space:]]*=[[:space:]]*ignore([[:space:]]|$)' \
+    /etc/systemd/logind.conf.d /etc/systemd/logind.conf
+
+printf '\n== suspend and hibernation ==\n'
+ok "suspend and hibernation are disabled by policy"
+skip "runtime suspend/hibernate test (intentionally not performed; s2idle is broken on the reference machine)"
+
+if [[ "$target_root" == "/" ]]; then
+    printf '\n== runtime visibility ==\n'
+    if compgen -G '/sys/class/thermal/thermal_zone*' >/dev/null 2>&1; then
+        ok "thermal zones are visible"
+    else
+        skip "no thermal zones in /sys/class/thermal"
+    fi
+    if compgen -G '/sys/class/power_supply/BAT*' >/dev/null 2>&1; then
+        ok "battery is visible"
+    else
+        skip "no battery in /sys/class/power_supply (desktop or VM)"
+    fi
+    if [[ -r /sys/firmware/acpi/platform_profile ]]; then
+        ok "ACPI platform profile: $(cat /sys/firmware/acpi/platform_profile)"
+    else
+        info "no ACPI platform_profile; power-profiles-daemon will use its fallback"
+    fi
+    if [[ -r /sys/devices/system/cpu/microcode/version ]]; then
+        ok "CPU microcode revision: $(cat /sys/devices/system/cpu/microcode/version)"
+    else
+        info "microcode revision is not exposed by this kernel"
+    fi
+else
+    skip "runtime sysfs checks (inspecting a target root, not the running image)"
+fi
+
+if ((fail)); then
+    printf '\nHardware enablement check FAILED\n' >&2
+    exit 1
+fi
+printf '\nHardware enablement check passed\n'

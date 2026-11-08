@@ -34,23 +34,31 @@ for file in \
     iso/airootfs/etc/skel/.bash_logout \
     iso/airootfs/etc/skel/.config/maria-padilha/README.md \
     iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot \
+    iso/airootfs/usr/local/bin/maria-padilha-hardware-check \
+    iso/airootfs/etc/systemd/sleep.conf.d/10-maria-padilha-no-s2idle.conf \
+    iso/airootfs/etc/systemd/logind.conf.d/10-maria-padilha-no-autosuspend.conf \
     iso/efiboot/loader/entries/01-maria-padilha-linux.conf \
     iso/syslinux/syslinux.cfg \
     iso/syslinux/archiso_sys.cfg \
     scripts/overlay-dotfiles.sh \
+    scripts/check-hardware.sh \
     tests/first-boot.sh \
     tests/skel.sh \
-    docs/first-boot.md; do
+    tests/hardware.sh \
+    docs/first-boot.md \
+    docs/supported-hardware.md; do
     require_file "$file"
 done
 
 for executable in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.sh \
-    scripts/overlay-dotfiles.sh iso/profiledef.sh; do
+    tests/hardware.sh scripts/overlay-dotfiles.sh scripts/check-hardware.sh \
+    iso/airootfs/usr/local/bin/maria-padilha-hardware-check iso/profiledef.sh; do
     require_exec "$executable"
 done
 
 for script in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.sh \
-    scripts/overlay-dotfiles.sh iso/profiledef.sh; do
+    tests/hardware.sh scripts/overlay-dotfiles.sh scripts/check-hardware.sh \
+    iso/airootfs/usr/local/bin/maria-padilha-hardware-check iso/profiledef.sh; do
     if bash -n "$script" 2>/dev/null; then
         ok "$script syntax"
     else
@@ -129,7 +137,25 @@ has_pkg() {
 required_packages=(
     base
     linux
+    amd-ucode
     linux-firmware
+    linux-firmware-amd
+    linux-firmware-amdgpu
+    linux-firmware-atheros
+    linux-firmware-broadcom
+    linux-firmware-intel
+    linux-firmware-mediatek
+    linux-firmware-realtek
+    mesa
+    vulkan-radeon
+    libva
+    sof-firmware
+    alsa-ucm-conf
+    upower
+    lm_sensors
+    acpi
+    pciutils
+    usbutils
     mkinitcpio-archiso
     squashfs-tools
     syslinux
@@ -287,10 +313,11 @@ else
     bad "profiledef does not declare /etc/skel permissions"
 fi
 if grep -qF -- 'tests/first-boot.sh' tests/all.sh &&
-    grep -qF -- 'tests/skel.sh' tests/all.sh; then
-    ok "repository suite runs the skel and first-boot tests"
+    grep -qF -- 'tests/skel.sh' tests/all.sh &&
+    grep -qF -- 'tests/hardware.sh' tests/all.sh; then
+    ok "repository suite runs the skel, first-boot and hardware tests"
 else
-    bad "repository suite is missing a first-boot test"
+    bad "repository suite is missing a first-boot or hardware test"
 fi
 if grep -qE '^first-boot:' Makefile; then
     ok "Makefile has a first-boot target"

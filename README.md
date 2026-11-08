@@ -10,12 +10,15 @@ the tracked configs live in
 
 ## Status
 
-**Archiso scaffold + Calamares configuration + first-boot provisioning.** The
-profile, package selection, live user, greetd/tuigreet setup, build wrapper and
-first-boot provisioning are in place. The latter enables NetworkManager,
-Bluetooth, seatd, greetd and power-profiles-daemon, enables the PipeWire user
-stack, and populates `/etc/skel` from the tracked dotfiles without copying
-secrets. The offline installer layer is under
+**Archiso scaffold + Calamares configuration + first-boot provisioning +
+laptop hardware enablement.** The profile, package selection, live user,
+greetd/tuigreet setup, build wrapper and first-boot provisioning are in place.
+Laptop enablement adds AMD microcode and GPU firmware, the common Wi-Fi/Bluetooth
+firmware classes, SOF/UCM audio, and power/thermal tooling with automatic
+suspend disabled. The first-boot layer enables NetworkManager, Bluetooth, seatd,
+greetd and power-profiles-daemon, enables the PipeWire user stack, and populates
+`/etc/skel` from the tracked dotfiles without copying secrets. The offline
+installer layer is under
 `iso/airootfs/etc/calamares/`: Calamares modules, Maria Padilha branding, an
 ISO-local package repository and a manual QEMU checklist. No bootable ISO has
 been built and **no full install has been run**. Do not install this on a host,
@@ -23,6 +26,33 @@ and do not treat an untested local build as a release.
 
 See [docs/first-boot.md](docs/first-boot.md) for the service/skel design and the
 things that can only finish after the user's first graphical login.
+
+## Laptop hardware enablement
+
+The image targets the hardware classes used by the reference AMD laptop, not a
+single board. `iso/packages.x86_64` carries `amd-ucode`, the `linux-firmware`
+meta package and the AMD GPU, Wi-Fi/Bluetooth vendor splits, `mesa`/`vulkan-radeon`
+with VA-API, `sof-firmware` and `alsa-ucm-conf`, plus `power-profiles-daemon`,
+`upower`, `lm_sensors`, `acpi`, `pciutils` and `usbutils`. TLP, auto-cpufreq and
+thermald are deliberately absent so `power-profiles-daemon` remains the only
+power/thermal manager.
+
+s2idle suspend is known broken on the reference machine. Both suspend and
+hibernation are disabled in
+`iso/airootfs/etc/systemd/sleep.conf.d/10-maria-padilha-no-s2idle.conf`;
+`iso/airootfs/etc/systemd/logind.conf.d/10-maria-padilha-no-autosuspend.conf`
+ignores the lid switch, suspend/hibernate keys and idle action. The image does
+not enable automatic suspend.
+
+See [docs/supported-hardware.md](docs/supported-hardware.md) for the tested,
+best-effort and explicitly unsupported classes. The read-only check runs on a
+running image without root and never tests suspend or hibernation:
+
+```sh
+maria-padilha-hardware-check
+make hardware-check                 # from this checkout, against /
+make hardware-check ROOT=/mnt       # or a mounted target
+```
 
 ## Calamares installer
 
@@ -62,6 +92,10 @@ container; `build.sh` refuses to run on a non-Arch host and outside a container.
 | `scripts/overlay-dotfiles.sh` | copies the tracked dotfiles into `/etc/skel`, excluding secrets |
 | `tests/first-boot.sh` | chroot/nspawn verifier for ownership, service enablement and secrets |
 | `docs/first-boot.md` | first-login provisioning, limits and verification steps |
+| `iso/airootfs/usr/local/bin/maria-padilha-hardware-check` | read-only package/firmware check for a running image |
+| `scripts/check-hardware.sh` | checkout alias for the installed hardware check |
+| `docs/supported-hardware.md` | tested, best-effort and unsupported hardware classes |
+| `tests/hardware.sh` | hardware package/policy checks and a synthetic-root fixture |
 | `iso/efiboot/` | UEFI systemd-boot entries |
 | `iso/syslinux/` | BIOS syslinux entries |
 | `build.sh` | builds `maria-padilha`, publishes it to `out/repo`, then runs `mkarchiso` |
@@ -163,6 +197,8 @@ bash tests/all.sh                     # full static suite
 make test                             # same
 bash tests/first-boot.sh --profile    # first-login checks against iso/airootfs
 make first-boot ROOT=/mnt             # inspect an installed root (read-only)
+bash tests/hardware.sh                # hardware package/policy checks
+make hardware-check ROOT=/mnt         # inspect a mounted target (read-only)
 ```
 
 `tests/iso.sh` checks the profile files and version, required and forbidden
@@ -173,8 +209,11 @@ the dotfiles overlay with a temporary fixture and proves that `env.local.lua`,
 credentials and key-shaped values never reach skel. `tests/first-boot.sh` can
 run inside a chroot/systemd-nspawn (or inspect a root with `--root`) and checks
 ownership, enabled units, the session/wallpaper defaults and secrets without
-changing anything. None of these tests require root, `mkarchiso`, a network or
-a graphical session; `make first-boot` only reads the target it is pointed at.
+changing anything. `tests/hardware.sh` checks the laptop package/policy list
+and exercises the read-only hardware check against a synthetic root. None of
+these tests require root, `mkarchiso`, a network or a graphical session;
+`make first-boot` and `make hardware-check` only read the target they are
+pointed at.
 
 ## Host prerequisites
 
@@ -211,6 +250,10 @@ real build.
   [docs/first-boot.md](docs/first-boot.md).
 - A development build without the sibling dotfiles checkout has the shell
   setup but not the full tracked Hyprland/Quickshell configuration.
+- Laptop enablement is tested at the package/configuration level only. No
+  physical reference laptop has been booted in this checkout; s2idle suspend
+  and hibernation are explicitly unsupported and disabled until resume is fixed
+  and tested.
 
 `tests/all.sh` runs both the archiso and Calamares static suites. The QEMU
 checklist is manual and must be run against a real ISO before claiming an

@@ -32,4 +32,5 @@ file_permissions=(
   ["/etc/skel/.bashrc"]="0:0:644"
   ["/etc/skel/.profile"]="0:0:644"
   ["/etc/skel/.bash_logout"]="0:0:644"
+  ["/usr/local/bin/maria-padilha-hardware-check"]="0:0:755"
 )
