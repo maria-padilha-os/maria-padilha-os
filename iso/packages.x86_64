@@ -30,6 +30,10 @@ iw
 bluez
 bluez-utils
 
+# Session services: seats, power profiles and the user audio stack
+seatd
+power-profiles-daemon
+
 # Audio
 pipewire
 pipewire-pulse

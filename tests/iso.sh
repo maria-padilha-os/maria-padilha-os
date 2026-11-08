@@ -29,17 +29,28 @@ for file in \
     iso/airootfs/etc/greetd/config.toml \
     iso/airootfs/etc/maria-padilha-release \
     iso/airootfs/etc/mkinitcpio.conf.d/archiso.conf \
+    iso/airootfs/etc/skel/.bashrc \
+    iso/airootfs/etc/skel/.profile \
+    iso/airootfs/etc/skel/.bash_logout \
+    iso/airootfs/etc/skel/.config/maria-padilha/README.md \
+    iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot \
     iso/efiboot/loader/entries/01-maria-padilha-linux.conf \
     iso/syslinux/syslinux.cfg \
-    iso/syslinux/archiso_sys.cfg; do
+    iso/syslinux/archiso_sys.cfg \
+    scripts/overlay-dotfiles.sh \
+    tests/first-boot.sh \
+    tests/skel.sh \
+    docs/first-boot.md; do
     require_file "$file"
 done
 
-for executable in build.sh tests/all.sh tests/iso.sh iso/profiledef.sh; do
+for executable in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.sh \
+    scripts/overlay-dotfiles.sh iso/profiledef.sh; do
     require_exec "$executable"
 done
 
-for script in build.sh tests/all.sh tests/iso.sh iso/profiledef.sh; do
+for script in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.sh \
+    scripts/overlay-dotfiles.sh iso/profiledef.sh; do
     if bash -n "$script" 2>/dev/null; then
         ok "$script syntax"
     else
@@ -148,6 +159,8 @@ required_packages=(
     noto-fonts-emoji
     greetd
     greetd-tuigreet
+    seatd
+    power-profiles-daemon
     maria-padilha
 )
 for package in "${required_packages[@]}"; do
@@ -191,6 +204,25 @@ else
     bad "bluetooth.service is not enabled"
 fi
 
+require_symlink() {
+    local path="$1" target="$2"
+    if [[ -L "$path" && "$(readlink -- "$path")" == "$target" ]]; then
+        ok "${path#iso/airootfs/} -> $target"
+    else
+        bad "${path#iso/airootfs/} is not linked to $target"
+    fi
+}
+
+for unit in seatd power-profiles-daemon; do
+    require_symlink         "iso/airootfs/etc/systemd/system/multi-user.target.wants/$unit.service"         "/usr/lib/systemd/system/$unit.service"
+done
+for unit in pipewire pipewire-pulse wireplumber; do
+    require_symlink         "iso/airootfs/etc/systemd/user/default.target.wants/$unit.service"         "/usr/lib/systemd/user/$unit.service"
+done
+for unit in pipewire pipewire-pulse; do
+    require_symlink         "iso/airootfs/etc/systemd/user/sockets.target.wants/$unit.socket"         "/usr/lib/systemd/user/$unit.socket"
+done
+
 # Profile metadata and boot files.
 if grep -q '^\[core\]' iso/pacman.conf && grep -q '^\[extra\]' iso/pacman.conf &&
     grep -q '^Architecture' iso/pacman.conf; then
@@ -225,6 +257,45 @@ if grep -qF -- 'mkarchiso' build.sh &&
     ok "build.sh checks mkarchiso and the Arch container guard"
 else
     bad "build.sh is missing the mkarchiso/container guard"
+fi
+if grep -qF -- 'overlay-dotfiles.sh' build.sh; then
+    ok "build.sh uses the dotfiles overlay helper"
+else
+    bad "build.sh does not use scripts/overlay-dotfiles.sh"
+fi
+for pattern in 'env.local.lua' 'env.local.example.lua' 'copy_config_dir hypr'     'copy_config_dir quickshell' 'credentials' 'secret'; do
+    if grep -qF -- "$pattern" scripts/overlay-dotfiles.sh; then
+        ok "overlay helper handles $pattern"
+    else
+        bad "overlay helper does not handle $pattern"
+    fi
+done
+if find iso/airootfs/etc/skel -type f \( -name 'env.local*.lua' -o -name '.env' \
+    -o -iname '*credential*' -o -iname '*secret*' \) -print | grep -q .; then
+    bad "/etc/skel contains a credential-looking file"
+else
+    ok "/etc/skel has no credential-looking files"
+fi
+if grep -qF -- '--sessions /usr/share/wayland-sessions' iso/airootfs/etc/greetd/config.toml; then
+    ok "greetd lists the installed Maria Padilha session"
+else
+    bad "greetd does not list /usr/share/wayland-sessions"
+fi
+if grep -qF -- '/etc/skel' iso/profiledef.sh; then
+    ok "profiledef declares skeleton permissions"
+else
+    bad "profiledef does not declare /etc/skel permissions"
+fi
+if grep -qF -- 'tests/first-boot.sh' tests/all.sh &&
+    grep -qF -- 'tests/skel.sh' tests/all.sh; then
+    ok "repository suite runs the skel and first-boot tests"
+else
+    bad "repository suite is missing a first-boot test"
+fi
+if grep -qE '^first-boot:' Makefile; then
+    ok "Makefile has a first-boot target"
+else
+    bad "Makefile first-boot target missing"
 fi
 
 # Secret and credential scan over the working tree (tracked and untracked).

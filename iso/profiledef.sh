@@ -28,4 +28,8 @@ file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/etc/sudoers.d/10-maria-live"]="0:0:440"
   ["/root"]="0:0:750"
+  ["/etc/skel"]="0:0:755"
+  ["/etc/skel/.bashrc"]="0:0:644"
+  ["/etc/skel/.profile"]="0:0:644"
+  ["/etc/skel/.bash_logout"]="0:0:644"
 )

@@ -1,0 +1,84 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Prepare the installed target before Calamares creates the real user.
+#
+# The target root is unpacked from the live squashfs, so it still contains the
+# ephemeral live account and the live greetd autologin.  Both are wrong for an
+# installed system.  Calamares runs this helper with dontChroot: false, before
+# the users module, so the target user can safely reuse the live UID/GID.
+#
+# This is installer code, not something the desktop runs at boot.  It is
+# idempotent and never touches a user that was not created by the live image.
+set -u
+
+die() { printf '[first-boot-setup] ERROR: %s\n' "$*" >&2; exit 1; }
+
+live_marker=/etc/sudoers.d/10-maria-live
+live_user=maria
+live_marker_present=0
+if [ -f "$live_marker" ]; then
+    live_marker_present=1
+    rm -f -- "$live_marker" ||
+        die "cannot remove $live_marker"
+fi
+
+# 2. Remove the live account only when the live marker proves it is ours.  A
+#    target that was somehow already provisioned with a real maria account is
+#    left alone.
+if [ -f /etc/passwd ] && grep -q "^${live_user}:" /etc/passwd; then
+    if [ "$live_marker_present" -eq 1 ] || [ -f /etc/sysusers.d/maria-live.conf ]; then
+        if command -v userdel >/dev/null 2>&1; then
+            userdel -r "$live_user" >/dev/null 2>&1 || userdel "$live_user" >/dev/null 2>&1 || true
+        fi
+        if command -v groupdel >/dev/null 2>&1 && getent group "$live_user" >/dev/null 2>&1; then
+            groupdel "$live_user" >/dev/null 2>&1 || true
+        fi
+        rm -rf -- "/home/${live_user:?}"
+    fi
+fi
+rm -f -- /etc/sysusers.d/maria-live.conf
+rm -f -- /var/lib/systemd/linger/maria
+
+# 3. The installed greeter must not use the live [initial_session] autologin.
+#    Write the same tuigreet default the live image uses after logout, with no
+#    initial session, so the user chooses "Maria Padilha" at first boot.
+install -d -m 0755 /etc/greetd
+cat >/etc/greetd/config.toml <<'EOF'
+[terminal]
+vt = 1
+
+# The installed system has no autologin.  tuigreet lists the session entries
+# installed by the maria-padilha package, including Maria Padilha.
+[default_session]
+command = "tuigreet --time --remember --remember-user-session --sessions /usr/share/wayland-sessions --greeting 'Maria Padilha'"
+user = "greeter"
+EOF
+chmod 0644 /etc/greetd/config.toml
+
+# 4. Keep the skeleton root-owned and readable; useradd copies it into the
+#    target user's home after this job.  Executable helper scripts keep their
+#    mode.
+if [ -d /etc/skel ]; then
+    chown -R root:root /etc/skel 2>/dev/null || true
+    find /etc/skel -type d -exec chmod 0755 {} + 2>/dev/null || true
+    find /etc/skel -type f -perm /111 -exec chmod 0755 {} + 2>/dev/null || true
+    find /etc/skel -type f ! -perm /111 -exec chmod 0644 {} + 2>/dev/null || true
+fi
+install -d -m 0755 /home
+
+# 5. Make the global PipeWire user enablement explicit.  airootfs already
+#    carries these links; recreating them here is harmless and protects the
+#    installed target if the profile layout changes.
+install -d -m 0755 /etc/systemd/user/default.target.wants \
+    /etc/systemd/user/sockets.target.wants
+for unit in pipewire.service pipewire-pulse.service wireplumber.service; do
+    ln -sfn "/usr/lib/systemd/user/$unit" \
+        "/etc/systemd/user/default.target.wants/$unit"
+done
+for unit in pipewire.socket pipewire-pulse.socket; do
+    ln -sfn "/usr/lib/systemd/user/$unit" \
+        "/etc/systemd/user/sockets.target.wants/$unit"
+done
+
+printf '[first-boot-setup] target prepared: live account removed, install greeter has no autologin\n'

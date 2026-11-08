@@ -10,13 +10,19 @@ the tracked configs live in
 
 ## Status
 
-**Archiso scaffold + Calamares configuration.** The profile, package selection,
-live user, greetd/tuigreet setup and build wrapper are in place, and the offline
-installer layer is under `iso/airootfs/etc/calamares/`: Calamares modules,
-Maria Padilha branding, an ISO-local package repository and a manual QEMU
-checklist. No bootable ISO has been built and **no full install has been run**.
-Do not install this on a host, and do not treat an untested local build as a
-release.
+**Archiso scaffold + Calamares configuration + first-boot provisioning.** The
+profile, package selection, live user, greetd/tuigreet setup, build wrapper and
+first-boot provisioning are in place. The latter enables NetworkManager,
+Bluetooth, seatd, greetd and power-profiles-daemon, enables the PipeWire user
+stack, and populates `/etc/skel` from the tracked dotfiles without copying
+secrets. The offline installer layer is under
+`iso/airootfs/etc/calamares/`: Calamares modules, Maria Padilha branding, an
+ISO-local package repository and a manual QEMU checklist. No bootable ISO has
+been built and **no full install has been run**. Do not install this on a host,
+and do not treat an untested local build as a release.
+
+See [docs/first-boot.md](docs/first-boot.md) for the service/skel design and the
+things that can only finish after the user's first graphical login.
 
 ## Calamares installer
 
@@ -52,11 +58,15 @@ container; `build.sh` refuses to run on a non-Arch host and outside a container.
 | `iso/profiledef.sh` | archiso profile, boot modes and file permissions |
 | `iso/packages.x86_64` | live-root package list |
 | `iso/pacman.conf` | official repositories; `build.sh` appends the local package repository |
-| `iso/airootfs/` | live user, greetd config, enabled units, `/etc/skel`, mkinitcpio config |
+| `iso/airootfs/` | live user, greetd config, enabled system/user units, `/etc/skel`, mkinitcpio config |
+| `scripts/overlay-dotfiles.sh` | copies the tracked dotfiles into `/etc/skel`, excluding secrets |
+| `tests/first-boot.sh` | chroot/nspawn verifier for ownership, service enablement and secrets |
+| `docs/first-boot.md` | first-login provisioning, limits and verification steps |
 | `iso/efiboot/` | UEFI systemd-boot entries |
 | `iso/syslinux/` | BIOS syslinux entries |
 | `build.sh` | builds `maria-padilha`, publishes it to `out/repo`, then runs `mkarchiso` |
 | `tests/iso.sh` | static profile, package, permission, version and secret checks |
+| `tests/skel.sh` | dotfiles-overlay fixture: allowlist, modes and secret rejection |
 
 The installed root deliberately does **not** include `base-devel` or a compiler
 toolchain. `build.sh` installs package build dependencies in the throw-away Arch
@@ -74,6 +84,20 @@ back to `tuigreet`, which lists the Maria Padilha session installed by the
 The live account has no password and may use `sudo`; root is locked. The ISO is
 ephemeral. `iso/airootfs/etc/greetd/config.toml`,
 `iso/packages.x86_64` and the enabled `greetd.service` unit must stay in sync.
+
+The same profile enables `seatd.service` and `power-profiles-daemon.service`
+for systems that use them, and links `NetworkManager`, `bluetooth`, `greetd`
+and `display-manager.service`. PipeWire is enabled globally for user sessions
+through `/etc/systemd/user/{default,sockets}.target.wants`; it starts with the
+user manager at login, not during boot. Calamares enables the system units in
+the installed target through `modules/services-systemd.conf`.
+
+Calamares also runs
+`iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot` before creating
+the target user. It removes the live-only passwordless `maria` account, its
+sudoers/sysusers entries and the live greetd `[initial_session]` autologin, so
+the installed system does not inherit the live configuration. See
+[docs/first-boot.md](docs/first-boot.md).
 
 ## Build
 
@@ -104,10 +128,15 @@ The result is `out/maria-padilha-<pkgver>-x86_64.iso`. `make iso` is the same
 thing and must run in the same container.
 
 If the dotfiles checkout is absent, the build still succeeds but `/etc/skel`
-only carries this repository's placeholder. If the package source tarball is
-missing from `maria-padilha-de/packaging/`, `build.sh` exports the current git
-HEAD into the scratch directory with `git archive`, matching
-`tools/release.sh --export`.
+only carries this repository's shell setup and placeholder; a release image
+should be built with the dotfiles mounted. When present, `build.sh` calls
+`scripts/overlay-dotfiles.sh`, which copies Hyprland, Quickshell, Neovim,
+WezTerm, micro and the three static Midnight Commander files. It never copies
+`hypr/hyprland/env.local.lua`, key material, `.env`, git credentials or other
+credential-looking files, then scans the result and fails the build if it finds
+a key-shaped value. If the package source tarball is missing from
+`maria-padilha-de/packaging/`, `build.sh` exports the current git HEAD into the
+scratch directory with `git archive`, matching `tools/release.sh --export`.
 
 Use an already built package instead of running `makepkg`:
 
@@ -130,14 +159,22 @@ checkout is present, `tests/iso.sh` fails if the pin and PKGBUILD disagree.
 ## Tests
 
 ```sh
-bash tests/all.sh     # hygiene + tests/iso.sh
-make test             # same
+bash tests/all.sh                     # full static suite
+make test                             # same
+bash tests/first-boot.sh --profile    # first-login checks against iso/airootfs
+make first-boot ROOT=/mnt             # inspect an installed root (read-only)
 ```
 
 `tests/iso.sh` checks the profile files and version, required and forbidden
-package names, executable bits, greetd enablement, boot entries, the mkinitcpio
-archiso hook, no `.env`, and obvious API/private-key patterns. It does not
-require root or `mkarchiso`.
+package names, executable bits, system and user service enablement, the skel
+shell setup, greetd/session discovery, boot entries, the mkinitcpio archiso
+hook, no `.env`, and obvious API/private-key patterns. `tests/skel.sh` exercises
+the dotfiles overlay with a temporary fixture and proves that `env.local.lua`,
+credentials and key-shaped values never reach skel. `tests/first-boot.sh` can
+run inside a chroot/systemd-nspawn (or inspect a root with `--root`) and checks
+ownership, enabled units, the session/wallpaper defaults and secrets without
+changing anything. None of these tests require root, `mkarchiso`, a network or
+a graphical session; `make first-boot` only reads the target it is pointed at.
 
 ## Host prerequisites
 
@@ -165,10 +202,15 @@ real build.
 
 - A bootable ISO has not been built yet.
 - Calamares/offline installation is configured, but the QEMU acceptance
-  checklist has not been run.
+  checklist has not been run, so first boot is not yet proven end to end.
 - No signed ISO, checksum publication or QEMU smoke test.
 - The live session is intentionally ephemeral and has an empty live-user
   password; do not reuse this configuration for an installed system.
+- PipeWire, wallpaper/palette generation, the Quickshell process, keyring/polkit
+  and Firefox theming finish only after the first graphical login; see
+  [docs/first-boot.md](docs/first-boot.md).
+- A development build without the sibling dotfiles checkout has the shell
+  setup but not the full tracked Hyprland/Quickshell configuration.
 
 `tests/all.sh` runs both the archiso and Calamares static suites. The QEMU
 checklist is manual and must be run against a real ISO before claiming an

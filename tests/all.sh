@@ -22,4 +22,16 @@ else
   echo "FAIL tests/calamares.sh"
   fail=1
 fi
+if bash tests/skel.sh; then
+  echo "ok tests/skel.sh"
+else
+  echo "FAIL tests/skel.sh"
+  fail=1
+fi
+if bash tests/first-boot.sh --profile; then
+  echo "ok tests/first-boot.sh --profile"
+else
+  echo "FAIL tests/first-boot.sh --profile"
+  fail=1
+fi
 [ "$fail" -eq 0 ]

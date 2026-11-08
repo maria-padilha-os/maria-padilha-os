@@ -26,9 +26,9 @@ the Calamares layer that lands in the profile's `airootfs`.
 
 The user-visible pages are **welcome → locale/timezone → keyboard → partition →
 software → user → summary**.  The execution phase partitions, mounts, unpacks
-the squashfs, writes locale/keyboard/fstab/initramfs, creates the user, prepares
-the offline pacman repository, installs the selected packages and the
-bootloader, then unmounts.
+the squashfs, writes locale/keyboard/fstab/initramfs, removes the live-only
+account/autologin, creates the user, prepares the offline pacman repository,
+installs the selected packages and the bootloader, then unmounts.
 
 - **Locale and timezone.**  Calamares has no standalone timezone module; the
   `locale` module owns both.  `locale.conf` pins the initial map to
@@ -40,7 +40,15 @@ bootloader, then unmounts.
   `efibootmgr` are installed from the local repository before the bootloader
   module runs.
 - **User.**  One user with `wheel` sudo rights, a separate root password, no
-  autologin.  greetd, NetworkManager and Bluetooth are enabled for the target.
+  autologin.  The preceding `shellprocess` job removes the passwordless live
+  `maria` account, its sudo rule and the live greetd autologin before this
+  module runs; see
+  `iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot`.  greetd,
+  NetworkManager, Bluetooth, seatd and power-profiles-daemon are enabled for the
+  target; the PipeWire user stack is enabled globally through
+  `/etc/systemd/user`.  `/etc/skel` comes from the image and carries the tracked
+  desktop configs without secrets.  See [first-boot.md](first-boot.md) for what
+  finishes at the first graphical login.
 
 ## Offline package repository
 
@@ -94,8 +102,10 @@ bash tests/all.sh         # repository suite
 
 `tests/calamares.sh` parses every YAML config when PyYAML is available, checks
 the module sequence, the ext4/no-LUKS partition policy, the no-network package
-settings, the branding files and palette, the offline helper manifest, and the
-shell scripts.  It is a configuration test, not an installation test.
+settings, the enabled system units, the branding files and palette, the offline
+helper manifest, and the shell scripts.  It is a configuration test, not an
+installation test.  First-boot ownership and service checks live in
+`tests/first-boot.sh` and are documented in [first-boot.md](first-boot.md).
 
 ## Manual QEMU checklist
 

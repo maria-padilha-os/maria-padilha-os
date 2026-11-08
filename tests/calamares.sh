@@ -51,6 +51,7 @@ for path in \
     "$brand_dir/welcome.svg" \
     "$brand_dir/show.qml" \
     "iso/airootfs/usr/local/bin/maria-padilha-calamares-offline" \
+    "iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot" \
     "iso/airootfs/var/cache/calamares/offline-repo/README.md" \
     "iso/calamares/live-packages.x86_64" \
     "iso/calamares/offline-packages.x86_64" \
@@ -108,6 +109,7 @@ if settings.get("prompt-install") is not True:
     raise AssertionError("settings.conf should prompt before executing the install")
 
 sequence = []
+exec_sequence = []
 for phase in settings.get("sequence") or []:
     if not isinstance(phase, dict):
         raise AssertionError("settings.conf sequence entries must be mappings")
@@ -115,6 +117,8 @@ for phase in settings.get("sequence") or []:
         if key not in ("show", "exec"):
             raise AssertionError(f"unknown sequence phase: {key}")
         sequence.extend(values or [])
+        if key == "exec":
+            exec_sequence.extend(values or [])
 
 required_modules = {
     "welcome", "locale", "keyboard", "partition", "users",
@@ -125,8 +129,12 @@ if missing:
     raise AssertionError(f"settings.conf is missing modules: {sorted(missing)}")
 if "netinstall" in sequence:
     raise AssertionError("netinstall is not part of an offline installer")
-for before, after in (("shellprocess", "packages"), ("packages", "bootloader")):
-    if sequence.index(before) >= sequence.index(after):
+for before, after in (
+    ("shellprocess", "users"),
+    ("shellprocess", "packages"),
+    ("packages", "bootloader"),
+):
+    if exec_sequence.index(before) >= exec_sequence.index(after):
         raise AssertionError(f"{before} must run before {after}")
 
 welcome = load(modules / "welcome.conf")
@@ -183,6 +191,27 @@ for operation in operations:
 if not {"grub", "efibootmgr"} <= set(installed):
     raise AssertionError("packages.conf must install grub and efibootmgr from the ISO")
 
+services = load(modules / "services-systemd.conf")
+service_units = {}
+for unit in services.get("units") or []:
+    if not isinstance(unit, dict) or not unit.get("name"):
+        raise AssertionError("services-systemd.conf has an invalid unit entry")
+    service_units[unit["name"]] = unit
+for name in (
+    "NetworkManager.service",
+    "bluetooth.service",
+    "seatd.service",
+    "power-profiles-daemon.service",
+    "greetd.service",
+):
+    entry = service_units.get(name)
+    if not entry:
+        raise AssertionError(f"services-systemd.conf does not enable {name}")
+    if entry.get("action") != "enable":
+        raise AssertionError(f"services-systemd.conf must enable {name}")
+if not service_units["greetd.service"].get("mandatory"):
+    raise AssertionError("greetd.service must be mandatory for a graphical first boot")
+
 chooser = load(modules / "packagechooser.conf")
 if chooser.get("method") != "packages":
     raise AssertionError("packagechooser.conf must hand packages to the packages module")
@@ -202,6 +231,17 @@ if missing_manifest:
 live_manifest = manifest_names(live_manifest_path)
 if "calamares" not in live_manifest:
     raise AssertionError("calamares is not in the live package list")
+
+shellprocess = load(modules / "shellprocess.conf")
+script = shellprocess.get("script") or []
+for helper in (
+    "/usr/local/bin/maria-padilha-calamares-first-boot",
+    "/usr/local/bin/maria-padilha-calamares-offline",
+):
+    if helper not in script:
+        raise AssertionError(f"shellprocess.conf does not run {helper}")
+if shellprocess.get("dontChroot") is not False:
+    raise AssertionError("shellprocess jobs must run inside the target")
 
 bootloader = load(modules / "bootloader.conf")
 if bootloader.get("efiBootLoader") not in ("grub", "systemd-boot"):
@@ -258,10 +298,25 @@ fi
 
 # The target helper must only wire file:// and must not call privileged tools.
 helper="iso/airootfs/usr/local/bin/maria-padilha-calamares-offline"
+first_boot_helper="iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot"
 if grep -q 'file:///var/cache/calamares/offline-repo' "$helper"; then
     ok "target pacman uses the ISO-local file:// repository"
 else
     bad "target helper does not point at the ISO-local repository"
+fi
+
+if grep -q '10-maria-live' "$first_boot_helper" &&
+    grep -q 'userdel' "$first_boot_helper" &&
+    grep -q '\[default_session\]' "$first_boot_helper"; then
+    ok "first-boot helper removes the live account and installs a non-autologin greeter"
+else
+    bad "first-boot helper does not clean the live account/greeter"
+fi
+if grep -q 'initial_session' "$first_boot_helper" &&
+    ! grep -qE '^\[initial_session\]' "$first_boot_helper"; then
+    ok "first-boot helper does not write a live initial_session block"
+else
+    bad "first-boot helper may write an initial_session block"
 fi
 
 if grep -RInE '(^|[;&|[:space:]])(sudo|pkexec|systemctl|mount)([[:space:]]|$)' \
@@ -316,6 +371,11 @@ if sh -n "$helper"; then
 else
     bad "POSIX sh syntax: $helper"
 fi
+if sh -n "$first_boot_helper"; then
+    ok "POSIX sh syntax: $first_boot_helper"
+else
+    bad "POSIX sh syntax: $first_boot_helper"
+fi
 
 if command -v shellcheck >/dev/null 2>&1; then
     if shellcheck -x scripts/calamares-offline-repo.sh; then
@@ -327,6 +387,11 @@ if command -v shellcheck >/dev/null 2>&1; then
         ok "shellcheck: $helper"
     else
         bad "shellcheck: $helper"
+    fi
+    if shellcheck -s sh "$first_boot_helper"; then
+        ok "shellcheck: $first_boot_helper"
+    else
+        bad "shellcheck: $first_boot_helper"
     fi
 else
     ok "shellcheck not installed; skipped"

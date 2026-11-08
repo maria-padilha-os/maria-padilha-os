@@ -76,9 +76,27 @@ qemu-system-x86_64 \
   -display gtk
 ```
 
-12. Log in as the created user.  Confirm the Hyprland/Quickshell session and
-    greetd login work.
-13. In the guest, check the installed system:
+12. Log in as the created user.  Confirm the Hyprland/Quickshell session,
+    default wallpaper and palette appear, and greetd login works.
+13. In the guest, confirm the live account and autologin did not survive:
+
+```sh
+test ! -e /etc/sudoers.d/10-maria-live
+test ! -e /etc/sysusers.d/maria-live.conf
+! grep -q '^\[initial_session\]' /etc/greetd/config.toml
+```
+
+14. Still in the guest, check the enabled units and first-login defaults:
+
+```sh
+systemctl is-enabled NetworkManager bluetooth seatd power-profiles-daemon greetd
+systemctl --user is-enabled pipewire pipewire-pulse wireplumber
+test -f /usr/share/wayland-sessions/maria-padilha.desktop
+padilha-daylight --dry-run
+ls ~/.local/state/padilha/wallpaper
+```
+
+15. In the guest, check the installed system:
 
 ```sh
 findmnt -no FSTYPE /
@@ -87,9 +105,9 @@ pacman -Q grub efibootmgr
 pacman -Qc maria-padilha
 ```
 
-14. Confirm the target did not install Calamares, and that the local repository
+16. Confirm the target did not install Calamares, and that the local repository
     still exists at `/var/cache/calamares/offline-repo`.
-15. Reboot once more and confirm the bootloader menu label contains
+17. Reboot once more and confirm the bootloader menu label contains
     "Maria Padilha".
 
 ## Negative checks

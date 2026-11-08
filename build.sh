@@ -267,9 +267,13 @@ prepare_repo() {
     log "local package repository: $repo_dir"
 }
 
+# The helper copies hypr, quickshell, nvim, wezterm, micro and the static mc
+# files.  It never copies hypr/hyprland/env.local.lua, key material, .env or
+# other credentials; see scripts/overlay-dotfiles.sh.
 overlay_dotfiles() {
-    local profile="$1" skel entry
+    local profile="$1" skel
     local dotdir="$dotfiles_dir"
+    local overlay="$root/scripts/overlay-dotfiles.sh"
     if [[ -n "${MARIA_PADILHA_DOTFILES:-}" && ! -d "$dotdir" ]]; then
         die "MARIA_PADILHA_DOTFILES is not a directory: $dotdir"
     fi
@@ -277,17 +281,11 @@ overlay_dotfiles() {
         warn "dotfiles checkout not found at $dotdir; /etc/skel keeps only this repository's skeleton"
         return 0
     fi
+    [[ -x "$overlay" ]] || die "dotfiles overlay helper is missing or not executable: $overlay"
     log "overlaying dotfiles from $dotdir"
-    skel="$profile/airootfs/etc/skel/.config"
+    skel="$profile/airootfs/etc/skel"
     install -d -m 0755 "$skel"
-    for entry in hypr nvim wezterm micro; do
-        [[ -d "$dotdir/$entry" ]] || continue
-        install -d -m 0755 "$skel/$entry"
-        tar -C "$dotdir/$entry" \
-            --exclude='.git' --exclude='*.bak' --exclude='*.log' \
-            --exclude='env.local.lua' --exclude='Session.vim' \
-            -cf - . | tar -C "$skel/$entry" -xf -
-    done
+    "$overlay" --source "$dotdir" --dest "$skel"
 }
 
 prepare_profile() {

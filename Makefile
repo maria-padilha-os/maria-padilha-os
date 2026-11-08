@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: all test iso package prereqs clean
+.PHONY: all test iso package prereqs first-boot clean
 
 all: test
 
@@ -25,6 +25,11 @@ prereqs:
 		'' \
 		'Required commands: mkarchiso pacstrap arch-chroot xorriso mksquashfs' \
 		'                  mkfs.fat mmd mcopy makepkg repo-add git bsdtar'
+
+# Inspect an installed root (default /) for first-login readiness.  Run this
+# inside the target chroot/nspawn, or pass ROOT=/mnt from the build host.
+first-boot:
+	bash tests/first-boot.sh --root "$${ROOT:-/}"
 
 clean:
 	rm -rf out .scratch/iso-build
