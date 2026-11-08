@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only
+     Maria Padilha candle mark.  Simple geometric vector art made for this
+     repository; no external artwork or font file is embedded. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Maria Padilha candle mark">
+  <circle cx="128" cy="128" r="118" fill="#1a0d0b" stroke="#b12e1b" stroke-width="6"/>
+  <circle cx="128" cy="128" r="101" fill="none" stroke="#2a1310" stroke-width="2"/>
+  <rect x="98" y="112" width="60" height="88" rx="8" fill="#f3e6da"/>
+  <rect x="98" y="112" width="60" height="10" rx="4" fill="#d8a24a"/>
+  <line x1="128" y1="112" x2="128" y2="92" stroke="#d8a24a" stroke-width="5" stroke-linecap="round"/>
+  <path d="M128 40 C151 69 168 82 168 104 C168 129 151 146 128 146 C105 146 88 129 88 104 C88 82 105 69 128 40 Z" fill="#d8a24a"/>
+  <path d="M128 65 C141 84 151 93 151 107 C151 121 141 131 128 131 C115 131 105 121 105 107 C105 93 115 84 128 65 Z" fill="#b12e1b"/>
+  <ellipse cx="128" cy="207" rx="34" ry="5" fill="#2a1310"/>
+</svg>

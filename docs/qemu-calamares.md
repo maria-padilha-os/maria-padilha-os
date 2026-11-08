@@ -49,8 +49,11 @@ qemu-system-x86_64 \
 
 ## Manual install steps
 
-1. Boot the live ISO.  Confirm the ISO boots with networking absent; the
-   installer must not complain that the internet is unavailable.
+1. Boot the live ISO.  Confirm the syslinux menu shows the Maria Padilha
+   splash and palette (BIOS) or the text-only Maria Padilha systemd-boot menu
+   (UEFI), then confirm the ISO boots with networking absent; the installer
+   must not complain that the internet is unavailable.  See
+   [qemu-branding.md](qemu-branding.md) for the dedicated boot-screen checklist.
 2. Launch Calamares and confirm the Maria Padilha name, candle logo and
    red/black/cream palette on the welcome page.
 3. Welcome: the requirements show storage and RAM only; no internet check.
@@ -77,7 +80,9 @@ qemu-system-x86_64 \
 ```
 
 12. Log in as the created user.  Confirm the Hyprland/Quickshell session,
-    default wallpaper and palette appear, and greetd login works.
+    default wallpaper and palette appear, and the themed greetd login works
+    when you log out.  See [qemu-branding.md](qemu-branding.md) for the greeter
+    and installed-GRUB visual checks.
 13. In the guest, confirm the live account and autologin did not survive:
 
 ```sh
@@ -107,8 +112,8 @@ pacman -Qc maria-padilha
 
 16. Confirm the target did not install Calamares, and that the local repository
     still exists at `/var/cache/calamares/offline-repo`.
-17. Reboot once more and confirm the bootloader menu label contains
-    "Maria Padilha".
+17. Reboot once more and confirm the GRUB menu contains "Maria Padilha" and
+    uses the candle-red/gold theme with readable fallback text.
 
 ## Negative checks
 

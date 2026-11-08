@@ -28,29 +28,39 @@ for file in \
     iso/package-version \
     iso/airootfs/etc/greetd/config.toml \
     iso/airootfs/etc/maria-padilha-release \
+    iso/airootfs/etc/maria-padilha/boot-palette.conf \
+    iso/airootfs/etc/plymouth/plymouthd.conf \
     iso/airootfs/etc/mkinitcpio.conf.d/archiso.conf \
     iso/airootfs/etc/skel/.bashrc \
     iso/airootfs/etc/skel/.profile \
     iso/airootfs/etc/skel/.bash_logout \
     iso/airootfs/etc/skel/.config/maria-padilha/README.md \
     iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot \
+    iso/airootfs/usr/local/bin/maria-padilha-greeter \
+    iso/airootfs/usr/share/plymouth/themes/maria-padilha/maria-padilha.plymouth \
+    iso/airootfs/boot/grub/themes/maria-padilha/theme.txt \
     iso/efiboot/loader/entries/01-maria-padilha-linux.conf \
     iso/syslinux/syslinux.cfg \
     iso/syslinux/archiso_sys.cfg \
+    iso/syslinux/splash.png \
     scripts/overlay-dotfiles.sh \
     tests/first-boot.sh \
     tests/skel.sh \
-    docs/first-boot.md; do
+    tests/branding.sh \
+    docs/first-boot.md \
+    docs/boot-branding.md \
+    docs/qemu-branding.md; do
     require_file "$file"
 done
 
 for executable in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.sh \
-    scripts/overlay-dotfiles.sh iso/profiledef.sh; do
+    tests/branding.sh scripts/overlay-dotfiles.sh iso/profiledef.sh \
+    iso/airootfs/usr/local/bin/maria-padilha-greeter; do
     require_exec "$executable"
 done
 
 for script in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.sh \
-    scripts/overlay-dotfiles.sh iso/profiledef.sh; do
+    tests/branding.sh scripts/overlay-dotfiles.sh iso/profiledef.sh; do
     if bash -n "$script" 2>/dev/null; then
         ok "$script syntax"
     else
@@ -159,6 +169,7 @@ required_packages=(
     noto-fonts-emoji
     greetd
     greetd-tuigreet
+    plymouth
     seatd
     power-profiles-daemon
     maria-padilha
@@ -179,11 +190,12 @@ for package in sddm base-devel gcc make cmake ninja; do
     fi
 done
 
-# Greeter choice is greetd + tuigreet and the config must say so.
+# Greeter choice is greetd + tuigreet through the themed wrapper, and the
+# config must still carry the live autologin and the Maria Padilha session.
 if grep -qF -- '[initial_session]' iso/airootfs/etc/greetd/config.toml &&
-    grep -qF -- 'tuigreet' iso/airootfs/etc/greetd/config.toml &&
+    grep -qF -- 'maria-padilha-greeter' iso/airootfs/etc/greetd/config.toml &&
     grep -qF -- 'Maria Padilha' iso/airootfs/etc/greetd/config.toml; then
-    ok "greetd + tuigreet is the configured greeter"
+    ok "greetd + themed tuigreet wrapper is the configured greeter"
 else
     bad "greetd config is not the documented greetd + tuigreet setup"
 fi
@@ -287,10 +299,17 @@ else
     bad "profiledef does not declare /etc/skel permissions"
 fi
 if grep -qF -- 'tests/first-boot.sh' tests/all.sh &&
-    grep -qF -- 'tests/skel.sh' tests/all.sh; then
-    ok "repository suite runs the skel and first-boot tests"
+    grep -qF -- 'tests/skel.sh' tests/all.sh &&
+    grep -qF -- 'tests/branding.sh' tests/all.sh; then
+    ok "repository suite runs the branding, skel and first-boot tests"
 else
-    bad "repository suite is missing a first-boot test"
+    bad "repository suite is missing a branding, skel or first-boot test"
+fi
+if grep -qF -- 'docs/qemu-branding.md' README.md &&
+    grep -qF -- 'docs/boot-branding.md' README.md; then
+    ok "README links the boot-branding design and QEMU checklist"
+else
+    bad "README does not link the boot-branding docs"
 fi
 if grep -qE '^first-boot:' Makefile; then
     ok "Makefile has a first-boot target"

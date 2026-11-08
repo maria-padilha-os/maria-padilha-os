@@ -2,14 +2,17 @@
 vt = 1
 
 # The live image goes straight into the Maria Padilha session as the
-# unprivileged live user. Logging out drops back to tuigreet, which lists the
-# Maria Padilha session installed by the maria-padilha package.
+# unprivileged live user. Logging out drops back to the themed greeter, which
+# lists the Maria Padilha session installed by the maria-padilha package.
 [initial_session]
 command = "hyprland"
 user = "maria"
 
 # greetd + tuigreet is the single greeter supported by this profile.
-# Keep packages.x86_64, this file and the enabled unit in sync.
+# Keep packages.x86_64, this file and the enabled unit in sync.  The wrapper
+# supplies the Maria Padilha --theme spec from boot-palette.conf, or from its
+# compiled-in fallback when that file is missing.  It never needs a user
+# session or a generated desktop palette to show a readable greeter.
 [default_session]
-command = "tuigreet --time --remember --remember-user-session --sessions /usr/share/wayland-sessions --greeting 'Maria Padilha'"
+command = "/usr/local/bin/maria-padilha-greeter --sessions /usr/share/wayland-sessions --greeting 'Maria Padilha'"
 user = "greeter"

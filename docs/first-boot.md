@@ -31,9 +31,13 @@ units in the installed target.
 The repo deliberately uses **greetd + tuigreet**, not SDDM. `iso/packages.x86_64`
 therefore carries `seatd`, `power-profiles-daemon`, `greetd` and
 `greetd-tuigreet`; `iso/airootfs/etc/calamares/modules/services-systemd.conf`
-enables them in the target. `power-profiles-daemon` is enabled where the package
-is present and the service is available, but it must not conflict with another
-power manager: this image does not install TLP, auto-cpufreq or similar.
+enables them in the target. The greeter command is
+`/usr/local/bin/maria-padilha-greeter`, which applies the Maria Padilha tuigreet
+theme from `/etc/maria-padilha/boot-palette.conf` and falls back to the same
+red/gold/white spec when that file is missing. `power-profiles-daemon` is
+enabled where the package is present and the service is available, but it must
+not conflict with another power manager: this image does not install TLP,
+auto-cpufreq or similar.
 
 ## PipeWire user services
 
@@ -67,7 +71,8 @@ the `users` module:
 - removes `/etc/sysusers.d/maria-live.conf`, so the account is not recreated on
   the next boot;
 - rewrites `/etc/greetd/config.toml` without the live `[initial_session]`
-  autologin, leaving tuigreet as the installed greeter;
+  autologin, leaving the themed `maria-padilha-greeter` as the installed
+  greeter;
 - normalises `/etc/skel` and recreates the global PipeWire user links.
 
 Removing the live account before `users` also frees UID/GID 1000, so the
@@ -131,10 +136,14 @@ The `maria-padilha` package installs:
 - the default day and night wallpapers under
   `/usr/lib/maria-padilha/share/wallpapers/`.
 
-`iso/airootfs/etc/greetd/config.toml` points tuigreet at
+`iso/airootfs/etc/greetd/config.toml` points the themed wrapper at
 `/usr/share/wayland-sessions`, and the live image enters Hyprland directly with
 `initial_session`. The installed system has no autologin; the user chooses the
-Maria Padilha entry.
+Maria Padilha entry. The wrapper never requires the session-generated palette:
+it uses its built-in fallback before the first login and switches to
+`/etc/maria-padilha/boot-palette.conf` when that file exists. See
+[boot-branding.md](boot-branding.md) for the palette paths and the manual
+[QEMU visual checklist](qemu-branding.md).
 
 On login, the tracked Hyprland config starts `padilha-session`. That command:
 

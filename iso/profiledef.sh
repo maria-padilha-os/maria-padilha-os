@@ -22,7 +22,7 @@ bootmodes=('bios.syslinux'
            'uefi.systemd-boot')
 airootfs_image_type="squashfs"
 airootfs_image_tool_options=('-comp' 'zstd' '-Xcompression-level' '15' '-b' '1M')
-kernel_params="quiet"
+kernel_params="quiet splash"
 declare -A file_permissions=()
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
@@ -32,4 +32,7 @@ file_permissions=(
   ["/etc/skel/.bashrc"]="0:0:644"
   ["/etc/skel/.profile"]="0:0:644"
   ["/etc/skel/.bash_logout"]="0:0:644"
+  ["/etc/maria-padilha/boot-palette.conf"]="0:0:644"
+  ["/etc/plymouth/plymouthd.conf"]="0:0:644"
+  ["/usr/local/bin/maria-padilha-greeter"]="0:0:755"
 )

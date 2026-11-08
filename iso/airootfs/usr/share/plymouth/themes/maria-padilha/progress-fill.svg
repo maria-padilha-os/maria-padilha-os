@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="8" viewBox="0 0 600 8">
+  <rect width="600" height="8" rx="4" fill="#b12e1b"/>
+  <rect x="0" y="0" width="600" height="3" rx="2" fill="#d8a24a" fill-opacity="0.65"/>
+</svg>

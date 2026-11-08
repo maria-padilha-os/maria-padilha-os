@@ -41,17 +41,21 @@ rm -f -- /etc/sysusers.d/maria-live.conf
 rm -f -- /var/lib/systemd/linger/maria
 
 # 3. The installed greeter must not use the live [initial_session] autologin.
-#    Write the same tuigreet default the live image uses after logout, with no
-#    initial session, so the user chooses "Maria Padilha" at first boot.
+#    Write the same themed greeter default the live image uses after logout,
+#    with no initial session, so the user chooses "Maria Padilha" at first
+#    boot.  The wrapper falls back to the checked-in palette if the generated
+#    system palette is absent.
 install -d -m 0755 /etc/greetd
 cat >/etc/greetd/config.toml <<'EOF'
 [terminal]
 vt = 1
 
-# The installed system has no autologin.  tuigreet lists the session entries
-# installed by the maria-padilha package, including Maria Padilha.
+# The installed system has no autologin.  The wrapper lists the session entries
+# installed by the maria-padilha package, including Maria Padilha, and applies
+# the Maria Padilha tuigreet theme with a readable fallback when no generated
+# palette file is present.
 [default_session]
-command = "tuigreet --time --remember --remember-user-session --sessions /usr/share/wayland-sessions --greeting 'Maria Padilha'"
+command = "/usr/local/bin/maria-padilha-greeter --sessions /usr/share/wayland-sessions --greeting 'Maria Padilha'"
 user = "greeter"
 EOF
 chmod 0644 /etc/greetd/config.toml
