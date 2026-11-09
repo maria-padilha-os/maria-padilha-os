@@ -4,3 +4,4 @@ out/
 *.img
 *.pkg.tar.zst
 .env
+.ci/

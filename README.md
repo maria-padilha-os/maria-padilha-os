@@ -12,9 +12,12 @@ the tracked configs live in
 
 **Boot/greeter branding and laptop hardware enablement.** The profile, package selection, live user, greetd/tuigreet setup, build wrapper, Plymouth theme, GRUB/syslinux menus and first-boot provisioning are in place. Laptop enablement adds AMD microcode and GPU firmware, common Wi-Fi/Bluetooth firmware, SOF/UCM audio and power/thermal tooling with automatic suspend disabled. First boot enables NetworkManager, Bluetooth, seatd, greetd and power-profiles-daemon, enables the PipeWire user stack, and populates `/etc/skel` from the tracked dotfiles without copying secrets. The offline installer layer is under
 `iso/airootfs/etc/calamares/`: Calamares modules, Maria Padilha branding, an
-ISO-local package repository and a manual QEMU checklist. No bootable ISO has
-been built and **no full install has been run**. Do not install this on a host,
-and do not treat an untested local build as a release.
+ISO-local package repository and a manual QEMU checklist. A GitHub Actions
+workflow now builds the `maria-padilha` package and ISO in an Arch container,
+records the SHA256 and offers an opt-in headless QEMU smoke boot; see
+[docs/ci.md](docs/ci.md). No bootable ISO has been built or booted in this
+checkout and **no full install has been run**. Do not install this on a host,
+and do not treat an untested local build or an unrun CI workflow as a release.
 
 See [docs/first-boot.md](docs/first-boot.md) for the service/skel design,
 [docs/boot-branding.md](docs/boot-branding.md) for the boot/greeter palette and
@@ -127,6 +130,11 @@ is downloaded or embedded.
 | `iso/efiboot/` | UEFI systemd-boot entries and menu settings |
 | `iso/syslinux/` | BIOS syslinux entries, menu palette and splash |
 | `build.sh` | builds `maria-padilha`, publishes it to `out/repo`, then runs `mkarchiso` |
+| `.github/workflows/iso.yml` | Arch-container package/ISO build, SHA256 artifact and opt-in QEMU smoke job |
+| `scripts/ci/build-iso.sh` | host wrapper for the privileged Arch build, checksum and build metadata |
+| `scripts/ci/container-build.sh` | in-container prerequisites and AUR-only `libcava` bootstrap |
+| `scripts/ci/qemu-smoke-test.sh` | headless serial boot, boot-marker/login check and panic detection |
+| `docs/ci.md` | CI inputs, artifacts, cache policy and runner/artifact limits |
 | `tests/iso.sh` | static profile, package, permission, version and secret checks |
 | `tests/skel.sh` | dotfiles-overlay fixture: allowlist, modes and secret rejection |
 
@@ -214,6 +222,42 @@ Use an already built package instead of running `makepkg`:
 Other useful options: `--de PATH`, `--pkgbuild PATH`, `--source PATH`,
 `--package-only`, `--keep-work`, `--help`.
 
+## Continuous integration
+
+`.github/workflows/iso.yml` runs the same build in a privileged
+`archlinux:latest` container on GitHub Actions. It checks out
+`maria-padilha-de` at the `v0.2.0` tag and the tracked dotfiles, builds the
+package and ISO with `build.sh`, verifies the SHA256 and uploads the ISO,
+checksum and `build-info.txt` as artifacts. It does not publish a release.
+
+Package downloads are cached under `.ci/cache/pacman`; the pacman database,
+build trees, secrets and ISOs are not cached. `libcava` is currently AUR-only,
+so `scripts/ci/container-build.sh` builds it with `makepkg` and feeds it to the
+ISO-local repository; the AUR source/package itself is not cached. The build
+wrapper is `scripts/ci/build-iso.sh`, which never runs `sudo` on the host:
+
+```sh
+make ci-iso          # or: bash scripts/ci/build-iso.sh
+
+# smoke-enabled build: add the serial console, serial getty and boot marker
+MARIA_PADILHA_KERNEL_PARAMS='quiet splash console=tty0 console=ttyS0,115200 systemd.wants=serial-getty@ttyS0.service maria-padilha.ci=1' \
+  make ci-iso
+make smoke-test      # boots the newest out/maria-padilha-*.iso
+```
+
+The headless QEMU check is **opt-in** (`workflow_dispatch` input
+`smoke_test`). It boots the ISO with `-display none`, a serial console and no
+network, waits for `MARIA_PADILHA_BOOT_OK` and a login prompt, and fails on a
+kernel panic, bootloader error or timeout. The ISO build adds the serial
+kernel parameters only for a smoke run; the normal live image keeps
+`kernel_params="quiet splash"`.
+
+GitHub-hosted runners have roughly 14 GB free disk, so the wrapper enforces a
+project ceiling of 9 GiB for the ISO and the smoke test is deliberately not run
+on every push. See [docs/ci.md](docs/ci.md) for the artifact names, pinning
+variables, cache policy and runner limits. A smoke-enabled build must be made
+before `make smoke-test` will find a serial login prompt.
+
 ## Package version
 
 `maria-padilha-de/packaging/PKGBUILD` is the source of truth. This repository
@@ -229,6 +273,7 @@ checkout is present, `tests/iso.sh` fails if the pin and PKGBUILD disagree.
 bash tests/all.sh                     # full static suite
 make test                             # same
 bash tests/branding.sh                # boot/greeter paths, sizes and fallback
+bash tests/ci.sh                      # CI workflow, artifact and smoke wiring
 bash tests/first-boot.sh --profile    # first-login checks against iso/airootfs
 make first-boot ROOT=/mnt             # inspect an installed root (read-only)
 bash tests/hardware.sh                # hardware package/policy checks
@@ -238,7 +283,9 @@ make hardware-check ROOT=/mnt         # inspect a mounted target (read-only)
 `tests/iso.sh` checks the profile files and version, required and forbidden
 package names, executable bits, system and user service enablement, the skel
 shell setup, greetd/session discovery, boot entries, the mkinitcpio archiso
-hook, no `.env`, and obvious API/private-key patterns. `tests/branding.sh`
+hook, no `.env`, and obvious API/private-key patterns. `tests/ci.sh` checks the
+workflow, checksum/artifact wiring, safe pacman cache, opt-in smoke policy and
+the serial boot marker without starting Docker, mkarchiso or QEMU. `tests/branding.sh`
 checks the Plymouth theme wiring, PNG dimensions, syslinux/GRUB styling,
 `plymouth` package and hook, kernel `splash` parameters, the greeter wrapper,
 and the no-palette/malformed-palette fallback without starting a graphical
@@ -284,7 +331,9 @@ real build.
   checklist in [docs/qemu-branding.md](docs/qemu-branding.md) has not been run,
   so the syslinux, Plymouth, GRUB and greeter screens are not yet visually
   confirmed.
-- No signed ISO, checksum publication or QEMU smoke test.
+- No signed ISO and no release publication. The CI workflow builds an unsigned
+  ISO and SHA256 artifact; its headless QEMU smoke test is opt-in and has not
+  been run in this checkout.
 - The live session is intentionally ephemeral and has an empty live-user
   password; do not reuse this configuration for an installed system.
 - PipeWire, wallpaper/palette generation, the Quickshell process, keyring/polkit
@@ -301,6 +350,8 @@ real build.
   and hibernation are explicitly unsupported and disabled until resume is fixed
   and tested.
 
-`tests/all.sh` runs the archiso, Calamares, branding, skel and first-boot static
-suites. The QEMU checklists are manual and must be run against a real ISO before
-claiming an install or a boot/login screen works.
+`tests/all.sh` runs the archiso, Calamares, branding, skel, first-boot and CI
+wiring static suites. The automated QEMU smoke test checks only a serial boot
+marker and login prompt; the QEMU visual/install checklists are still manual and
+must be run against a real ISO before claiming an install or a graphical login
+screen works.

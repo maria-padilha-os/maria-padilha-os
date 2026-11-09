@@ -48,12 +48,19 @@ for file in \
     iso/syslinux/splash.png \
     scripts/overlay-dotfiles.sh \
     scripts/check-hardware.sh \
+    scripts/ci/build-iso.sh \
+    scripts/ci/container-build.sh \
+    scripts/ci/qemu-smoke-test.sh \
+    .github/workflows/iso.yml \
+    iso/airootfs/etc/systemd/system/maria-padilha-ci-boot-marker.service \
+    tests/ci.sh \
     tests/first-boot.sh \
     tests/skel.sh \
     tests/branding.sh \
     docs/first-boot.md \
     docs/boot-branding.md \
     docs/qemu-branding.md \
+    docs/ci.md \
     tests/hardware.sh \
     docs/supported-hardware.md; do
     require_file "$file"
@@ -63,6 +70,8 @@ for executable in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/s
     tests/branding.sh scripts/overlay-dotfiles.sh iso/profiledef.sh \
     iso/airootfs/usr/local/bin/maria-padilha-greeter \
     tests/hardware.sh scripts/check-hardware.sh \
+    scripts/ci/build-iso.sh scripts/ci/container-build.sh \
+    scripts/ci/qemu-smoke-test.sh tests/ci.sh \
     iso/airootfs/usr/local/bin/maria-padilha-hardware-check; do
     require_exec "$executable"
 done
@@ -70,6 +79,8 @@ done
 for script in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.sh \
     tests/branding.sh scripts/overlay-dotfiles.sh iso/profiledef.sh \
     tests/hardware.sh scripts/check-hardware.sh \
+    scripts/ci/build-iso.sh scripts/ci/container-build.sh \
+    scripts/ci/qemu-smoke-test.sh tests/ci.sh \
     iso/airootfs/usr/local/bin/maria-padilha-hardware-check; do
     if bash -n "$script" 2>/dev/null; then
         ok "$script syntax"
@@ -353,7 +364,7 @@ fi
 # Secret and credential scan over the working tree (tracked and untracked).
 secret_pattern='(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AIza[0-9A-Za-z_-]{35}|xox[baprs]-[0-9A-Za-z-]{10,}|-----BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY-----)'
 secret_hits="$(mktemp)"
-if grep -RInE --exclude-dir=.git --exclude-dir=out --exclude-dir=.scratch -- "$secret_pattern" . >"$secret_hits" 2>/dev/null; then
+if grep -RInE --exclude-dir=.git --exclude-dir=out --exclude-dir=.scratch --exclude-dir=.ci -- "$secret_pattern" . >"$secret_hits" 2>/dev/null; then
     bad "possible tracked secret"
     cat "$secret_hits"
 else
@@ -361,7 +372,7 @@ else
 fi
 rm -f "$secret_hits"
 
-if find . -path ./.git -prune -o -path ./out -prune -o -path ./.scratch -prune -o -type f -name '.env' -print | grep -q .; then
+if find . -path ./.git -prune -o -path ./out -prune -o -path ./.scratch -prune -o -path ./.ci -prune -o -type f -name '.env' -print | grep -q .; then
     bad "a .env file is present in the tree"
 else
     ok "no .env file"

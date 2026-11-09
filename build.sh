@@ -55,6 +55,9 @@ Environment:
   MARIA_PADILHA_DE          same as --de
   MARIA_PADILHA_DOTFILES    dotfiles checkout to overlay on /etc/skel
   MARIA_PADILHA_BUILD_USER  unprivileged makepkg user (default: builder)
+  MARIA_PADILHA_EXTRA_REPO  directory of extra *.pkg.tar.* packages to add to
+                            the ISO-local repository (for AUR-only runtime
+                            dependencies such as libcava)
 
 Example inside archlinux:latest (with /work and the two sibling checkouts
 mounted read-only):
@@ -258,13 +261,31 @@ build_package() {
 }
 
 prepare_repo() {
-    local pkgfile="$1" repo_dir="$out_dir/repo"
+    local pkgfile="$1" repo_dir="$out_dir/repo" extra
+    local -a packages=("$pkgfile") extras=() repo_files=()
+    if [[ -n "${MARIA_PADILHA_EXTRA_REPO:-}" ]]; then
+        [[ -d "$MARIA_PADILHA_EXTRA_REPO" ]] ||
+            die "MARIA_PADILHA_EXTRA_REPO is not a directory: $MARIA_PADILHA_EXTRA_REPO"
+        shopt -s nullglob
+        extras=("$MARIA_PADILHA_EXTRA_REPO"/*.pkg.tar.*)
+        shopt -u nullglob
+        for extra in "${extras[@]}"; do
+            [[ "$extra" == *.sig ]] && continue
+            packages+=("$extra")
+        done
+        ((${#packages[@]} > 1)) ||
+            die "MARIA_PADILHA_EXTRA_REPO contains no package archives: $MARIA_PADILHA_EXTRA_REPO"
+    fi
+
     rm -rf "$repo_dir"
     install -d -m 0755 "$repo_dir"
-    cp -f "$pkgfile" "$repo_dir/"
-    repo-add "$repo_dir/maria-padilha.db.tar.gz" "$repo_dir/$(basename -- "$pkgfile")" >/dev/null ||
+    cp -f "${packages[@]}" "$repo_dir/"
+    for extra in "${packages[@]}"; do
+        repo_files+=("$repo_dir/$(basename -- "$extra")")
+    done
+    repo-add "$repo_dir/maria-padilha.db.tar.gz" "${repo_files[@]}" >/dev/null ||
         die "repo-add failed"
-    log "local package repository: $repo_dir"
+    log "local package repository: $repo_dir (${#repo_files[@]} package(s))"
 }
 
 # The helper copies hypr, quickshell, nvim, wezterm, micro and the static mc

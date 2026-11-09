@@ -1,0 +1,175 @@
+name: ISO build and smoke boot
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      smoke_test:
+        description: Boot the finished ISO in headless QEMU (opt-in)
+        required: false
+        type: boolean
+        default: false
+      de_ref:
+        description: maria-padilha-de git ref; blank uses MARIA_PADILHA_DE_REF or v0.2.0
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iso-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ARCH_IMAGE: ${{ vars.ARCH_IMAGE || 'archlinux:latest' }}
+  DE_REF: ${{ github.event.inputs.de_ref || vars.MARIA_PADILHA_DE_REF || 'v0.2.0' }}
+  DOTFILES_REF: ${{ vars.MARIA_PADILHA_DOTFILES_REF || 'known-good-2026-11-06e' }}
+  ISO_MAX_BYTES: ${{ vars.MARIA_PADILHA_MAX_ISO_BYTES || '9663676416' }}
+  PACMAN_CACHE: .ci/cache/pacman
+
+jobs:
+  build:
+    name: Build package and ISO
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      smoke_test: ${{ steps.decide.outputs.enabled }}
+    steps:
+      - name: Check out image repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Decide whether to run the opt-in smoke test
+        id: decide
+        env:
+          SMOKE_REQUESTED: ${{ github.event.inputs.smoke_test || 'false' }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "$SMOKE_REQUESTED" == "true" ]]; then
+            echo "enabled=true" >>"$GITHUB_OUTPUT"
+            echo "kernel_params=quiet splash console=tty0 console=ttyS0,115200 systemd.wants=serial-getty@ttyS0.service maria-padilha.ci=1" >>"$GITHUB_OUTPUT"
+            echo "::notice::QEMU smoke test enabled; this ISO includes serial-console and CI boot-marker kernel parameters."
+          else
+            echo "enabled=false" >>"$GITHUB_OUTPUT"
+            echo "kernel_params=" >>"$GITHUB_OUTPUT"
+            echo "::notice::QEMU smoke test is opt-in and was not requested. The ISO is still built, checksummed and uploaded; no smoke result is claimed."
+          fi
+
+      - name: Run static repository tests
+        run: bash tests/all.sh
+
+      - name: Check out desktop package source
+        uses: actions/checkout@v4
+        with:
+          repository: maria-padilha-os/maria-padilha-de
+          ref: ${{ env.DE_REF }}
+          path: .ci/maria-padilha-de
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out tracked dotfiles
+        uses: actions/checkout@v4
+        with:
+          repository: maria-padilha-os/maria-padilha-dotfiles
+          ref: ${{ env.DOTFILES_REF }}
+          path: .ci/maria-padilha-dotfiles
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Cache Arch package downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PACMAN_CACHE }}
+          key: arch-pacman-${{ runner.os }}-${{ hashFiles('iso/pacman.conf', 'iso/packages.x86_64', 'iso/calamares/offline-packages.x86_64', 'scripts/ci/build-iso.sh') }}
+          restore-keys: |
+            arch-pacman-${{ runner.os }}-
+
+      - name: Build ISO in privileged Arch container
+        env:
+          MARIA_PADILHA_DE: ${{ github.workspace }}/.ci/maria-padilha-de
+          MARIA_PADILHA_DOTFILES: ${{ github.workspace }}/.ci/maria-padilha-dotfiles
+          MARIA_PADILHA_PACMAN_CACHE: ${{ github.workspace }}/.ci/cache/pacman
+          MARIA_PADILHA_KERNEL_PARAMS: ${{ steps.decide.outputs.kernel_params }}
+          MARIA_PADILHA_MAX_ISO_BYTES: ${{ env.ISO_MAX_BYTES }}
+        run: bash scripts/ci/build-iso.sh
+
+      - name: Verify checksum and show build metadata
+        run: |
+          set -euo pipefail
+          cd out
+          shopt -s nullglob
+          checks=(./*.sha256)
+          ((${#checks[@]} == 1)) || { echo "expected exactly one checksum file"; exit 1; }
+          sha256sum -c "${checks[0]}"
+          cat build-info.txt
+          df -h .
+
+      - name: Upload ISO, checksum and build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: maria-padilha-iso
+          path: |
+            out/*.iso
+            out/*.sha256
+            out/build-info.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  smoke:
+    name: Headless QEMU smoke boot
+    needs: build
+    if: needs.build.outputs.smoke_test == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out image repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: maria-padilha-iso
+          path: out
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86
+
+      - name: Verify downloaded checksum
+        run: |
+          set -euo pipefail
+          cd out
+          shopt -s nullglob
+          checks=(./*.sha256)
+          ((${#checks[@]} == 1)) || { echo "expected exactly one checksum file"; exit 1; }
+          sha256sum -c "${checks[0]}"
+
+      - name: Boot ISO with serial console and wait for login
+        env:
+          SMOKE_TIMEOUT: "1200"
+          SMOKE_MEMORY_MB: "3072"
+          SMOKE_CPUS: "2"
+        run: |
+          set -euo pipefail
+          iso="$(ls -1 out/*.iso | head -n1)"
+          bash scripts/ci/qemu-smoke-test.sh "$iso"
+
+      - name: Upload QEMU serial log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-smoke-serial-log
+          path: out/qemu-smoke/
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7

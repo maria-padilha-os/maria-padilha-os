@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: all test iso package prereqs first-boot hardware-check clean
+.PHONY: all test iso package ci-iso smoke-test prereqs first-boot hardware-check clean
 
 all: test
 
@@ -10,6 +10,20 @@ test:
 # Build the package and the ISO. This must run inside an Arch container as root.
 iso:
 	./build.sh
+
+# Same build through the CI wrapper: privileged Arch container, checksum and
+# build metadata under out/. Never needs host root privileges.
+ci-iso:
+	bash scripts/ci/build-iso.sh
+
+# Boot the newest smoke-enabled ISO headlessly and wait for the serial login.
+smoke-test:
+	@iso="$$(ls -1t out/maria-padilha-*.iso 2>/dev/null | head -n1)"; \
+	if [ -z "$$iso" ]; then \
+		echo "no ISO under out/; run 'make ci-iso' first" >&2; \
+		exit 1; \
+	fi; \
+	bash scripts/ci/qemu-smoke-test.sh "$$iso"
 
 # Build only maria-padilha and stop before mkarchiso.
 package:

@@ -335,17 +335,20 @@ else
     bad "first-boot helper may write an initial_session block"
 fi
 
-if grep -RInE '(^|[;&|[:space:]])(sudo|pkexec|systemctl|mount)([[:space:]]|$)' \
-    scripts "$helper" >/dev/null 2>&1
+# Only the Calamares-specific scripts are in scope here.  scripts/ci/ also
+# contains the image build wrapper, which legitimately fetches the AUR package
+# for libcava.
+if grep -nE '(^|[;&|[:space:]])(sudo|pkexec|systemctl|mount)([[:space:]]|$)' \
+    scripts/calamares-offline-repo.sh "$helper" >/dev/null 2>&1
 then
     bad "a Calamares script invokes a privileged command"
-    grep -RInE '(^|[;&|[:space:]])(sudo|pkexec|systemctl|mount)([[:space:]]|$)' \
-        scripts "$helper" || true
+    grep -nE '(^|[;&|[:space:]])(sudo|pkexec|systemctl|mount)([[:space:]]|$)' \
+        scripts/calamares-offline-repo.sh "$helper" || true
 else
     ok "Calamares scripts contain no privileged command"
 fi
 
-if grep -RInE 'https?://|ftp://' scripts "$helper" >/dev/null 2>&1; then
+if grep -nE 'https?://|ftp://' scripts/calamares-offline-repo.sh "$helper" >/dev/null 2>&1; then
     bad "a Calamares script references a network endpoint"
 else
     ok "Calamares scripts contain no network endpoint"

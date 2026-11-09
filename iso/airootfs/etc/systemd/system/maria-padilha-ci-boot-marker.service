@@ -1,0 +1,16 @@
+[Unit]
+Description=Maria Padilha CI boot marker
+Documentation=file:///usr/share/doc/maria-padilha/README.md
+ConditionKernelCommandLine=maria-padilha.ci=1
+After=local-fs.target
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+ExecStart=/usr/bin/echo MARIA_PADILHA_BOOT_OK
+
+[Install]
+WantedBy=multi-user.target
