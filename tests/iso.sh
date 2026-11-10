@@ -52,8 +52,12 @@ for file in \
     scripts/ci/container-build.sh \
     scripts/ci/qemu-smoke-test.sh \
     .github/workflows/iso.yml \
+    .github/RELEASE_TEMPLATE.md \
     iso/airootfs/etc/systemd/system/maria-padilha-ci-boot-marker.service \
+    tools/release.sh \
+    CHANGELOG.md \
     tests/ci.sh \
+    tests/release.sh \
     tests/first-boot.sh \
     tests/skel.sh \
     tests/branding.sh \
@@ -61,6 +65,7 @@ for file in \
     docs/boot-branding.md \
     docs/qemu-branding.md \
     docs/ci.md \
+    docs/release-checklist.md \
     tests/hardware.sh \
     docs/supported-hardware.md; do
     require_file "$file"
@@ -71,7 +76,8 @@ for executable in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/s
     iso/airootfs/usr/local/bin/maria-padilha-greeter \
     tests/hardware.sh scripts/check-hardware.sh \
     scripts/ci/build-iso.sh scripts/ci/container-build.sh \
-    scripts/ci/qemu-smoke-test.sh tests/ci.sh \
+    scripts/ci/qemu-smoke-test.sh tests/ci.sh tests/release.sh \
+    tools/release.sh \
     iso/airootfs/usr/local/bin/maria-padilha-hardware-check; do
     require_exec "$executable"
 done
@@ -80,7 +86,8 @@ for script in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.
     tests/branding.sh scripts/overlay-dotfiles.sh iso/profiledef.sh \
     tests/hardware.sh scripts/check-hardware.sh \
     scripts/ci/build-iso.sh scripts/ci/container-build.sh \
-    scripts/ci/qemu-smoke-test.sh tests/ci.sh \
+    scripts/ci/qemu-smoke-test.sh tests/ci.sh tests/release.sh \
+    tools/release.sh \
     iso/airootfs/usr/local/bin/maria-padilha-hardware-check; do
     if bash -n "$script" 2>/dev/null; then
         ok "$script syntax"

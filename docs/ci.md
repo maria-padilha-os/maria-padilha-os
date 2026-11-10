@@ -5,6 +5,12 @@ image in a privileged Arch container, records the ISO SHA256, and uploads the
 image, checksum and build metadata as GitHub Actions artifacts. It deliberately
 does **not** create a release, tag or published asset.
 
+CI artifacts are inputs to the release process, not a release. A maintainer
+runs `tools/release.sh` locally to build or reuse an ISO, write and verify
+`SHA256SUMS`, and optionally sign it, then follows
+[`release-checklist.md`](release-checklist.md) to create a GitHub draft by
+hand. No workflow tags, uploads a release or deploys Pages.
+
 ## What runs
 
 | job | what it does | timeout |
