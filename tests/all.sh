@@ -46,6 +46,12 @@ else
   echo "FAIL tests/hardware.sh"
   fail=1
 fi
+if bash tests/rescue.sh; then
+  echo "ok tests/rescue.sh"
+else
+  echo "FAIL tests/rescue.sh"
+  fail=1
+fi
 if bash tests/ci.sh; then
   echo "ok tests/ci.sh"
 else

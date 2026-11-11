@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Enter the Maria Padilha rescue shell.  This script is run by the
+# maria-padilha-rescue.service unit when the kernel command line contains
+# maria-padilha.rescue=1.  It only prints guidance and starts an interactive
+# root shell; it never probes, mounts, partitions, formats or repairs anything
+# on its own.
+set -u
+
+usage() {
+    cat <<'EOF'
+Maria Padilha rescue shell
+
+Boot the ISO and choose "Maria Padilha Rescue" in the syslinux or
+systemd-boot menu.  The rescue entry starts this shell as root on tty1.
+
+Nothing is mounted or changed automatically.  First inspect the disks:
+
+  lsblk -o NAME,SIZE,FSTYPE,LABEL,PARTTYPENAME,MOUNTPOINTS
+  blkid
+  findmnt
+
+Then follow the documented procedure in docs/rescue.md from the
+maria-padilha-os repository.  The shell contains:
+
+  - util-linux: lsblk, blkid, findmnt, mount, umount, blkdiscard
+  - e2fsprogs (e2fsck, dumpe2fs, resize2fs), dosfstools, btrfs-progs,
+    xfsprogs, f2fs-tools, exfatprogs and ntfs-3g for filesystem
+    inspection and repair
+  - parted and gptfdisk for inspecting partition tables
+  - arch-install-scripts: arch-chroot for entering an installed root
+  - grub, grub-install, grub-mkconfig, efibootmgr for bootloader repair
+  - pacman and the Maria Padilha rollback helper for desktop updates
+
+The ISO is ephemeral.  Mount the installed root explicitly before repairing
+it, and unmount it before powering off.  Never run fsck on a mounted
+filesystem.  Avoid mkfs, parted and sgdisk unless you intend to destroy data.
+
+Usage: maria-padilha-rescue [--help]
+
+With no arguments this prints this text and starts /bin/bash.  With --help it
+prints this text and exits.
+EOF
+}
+
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    '')
+        usage
+        printf '\nStarting rescue shell.  Type "exit" to leave it.\n\n'
+        export PS1='(rescue) \u@\h:\w # '
+        exec /bin/bash --noprofile --norc
+        ;;
+    *)
+        printf 'maria-padilha-rescue: unknown argument: %s\n' "$1" >&2
+        printf 'Try --help for the rescue procedure.\n' >&2
+        exit 2
+        ;;
+esac

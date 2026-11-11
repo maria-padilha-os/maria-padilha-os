@@ -4,4 +4,9 @@ The graphical session starts automatically as the unprivileged maria user.
 Log out to return to the greetd/tuigreet login screen. Run sudo for installer
 or recovery commands. The live ISO is ephemeral: changes are lost on reboot.
 
+For filesystem or bootloader repair, reboot and choose "Maria Padilha Rescue"
+in the boot menu. Before a desktop update, save an explicit rollback point:
+
+  sudo maria-padilha-rollback save
+
 Package: maria-padilha

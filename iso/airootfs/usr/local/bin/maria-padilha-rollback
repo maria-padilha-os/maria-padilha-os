@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Explicit rollback helper for the Maria Padilha desktop package.
+#
+# This is intentionally not a snapshot system.  "save" copies the package
+# archive for the currently installed maria-padilha version into a normal
+# directory, "list" and "verify" inspect what is stored, and "apply" runs
+# pacman -U on one named archive after verifying its SHA256.  Nothing runs
+# automatically and no package is downloaded.
+set -euo pipefail
+
+pkgname="maria-padilha"
+state_dir="${MARIA_PADILHA_ROLLBACK_DIR:-/var/cache/maria-padilha/rollback}"
+mode=""
+version=""
+assume_yes=0
+dry_run=0
+declare -a cache_dirs=()
+
+if [[ -n "${MARIA_PADILHA_PACKAGE_CACHE:-}" ]]; then
+    cache_dirs+=("$MARIA_PADILHA_PACKAGE_CACHE")
+fi
+cache_dirs+=("/var/cache/pacman/pkg" "/var/cache/calamares/offline-repo")
+
+log() { printf '[maria-padilha-rollback] %s\n' "$*" >&2; }
+die() { printf '[maria-padilha-rollback] ERROR: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+    cat <<'EOF'
+usage: maria-padilha-rollback [options] COMMAND [VERSION]
+
+Explicit, inspectable rollback points for the Maria Padilha desktop package.
+
+commands:
+  save              copy the installed maria-padilha package archive into the
+                    rollback directory and refresh SHA256SUMS/manifest.txt
+  list              list the saved package archives (no root required)
+  verify            verify every saved archive against SHA256SUMS
+  apply VERSION     install the saved archive for VERSION with pacman -U;
+                    verifies the checksum first and asks for confirmation
+
+options:
+  --state-dir PATH  rollback directory
+                    (default: /var/cache/maria-padilha/rollback)
+  --cache-dir PATH  extra package-cache directory for "save" (repeatable;
+                    defaults also include /var/cache/pacman/pkg and
+                    /var/cache/calamares/offline-repo)
+  --yes             do not ask for confirmation in "apply"
+  --dry-run         print the apply command without running pacman
+  -h, --help        show this help
+
+"save" needs root because it writes the system cache directory.  "apply" needs
+root because it runs pacman.  "list" and "verify" are read-only.
+
+Save a point before updating:
+
+  sudo maria-padilha-rollback save
+  sudo pacman -Syu
+  # reboot; if the desktop is broken, boot the rescue entry and run
+  sudo maria-padilha-rollback apply 0.2.0
+
+The archive is package-scoped: this helper does not roll back the kernel,
+graphics stack or dependent packages.  Read the pacman output if it reports a
+dependency problem instead of forcing the transaction.
+EOF
+}
+
+need_root() {
+    ((EUID == 0)) || die "run as root (for example with sudo)"
+}
+
+state_archives() {
+    local file
+    shopt -s nullglob
+    for file in "$state_dir"/"$pkgname"-*.pkg.tar.*; do
+        [[ -f "$file" ]] || continue
+        case "$file" in
+            *.sig) continue ;;
+        esac
+        printf '%s\n' "$file"
+    done
+    shopt -u nullglob
+}
+
+write_metadata() {
+    local file tmp
+    local -a archives=()
+    mapfile -t archives < <(state_archives)
+    ((${#archives[@]} > 0)) || die "no saved package archives in $state_dir"
+
+    install -d -m 0755 -- "$state_dir"
+
+    tmp="$(mktemp "$state_dir/.SHA256SUMS.XXXXXX")"
+    (
+        cd "$state_dir"
+        for file in "${archives[@]}"; do
+            sha256sum -- "${file##*/}"
+        done
+    ) >"$tmp"
+    chmod 0644 -- "$tmp"
+    mv -f -- "$tmp" "$state_dir/SHA256SUMS"
+
+    tmp="$(mktemp "$state_dir/.manifest.XXXXXX")"
+    {
+        printf '# Maria Padilha desktop rollback points\n'
+        printf '# Generated %s by maria-padilha-rollback save.\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf '# Verify with: (cd %s && sha256sum -c SHA256SUMS)\n' "$state_dir"
+        printf '#\n# archive\tpackage metadata\n'
+        for file in "${archives[@]}"; do
+            local info=""
+            info="$(pacman -Qp --color never "$file" 2>/dev/null || true)"
+            printf '%s\t%s\n' "${file##*/}" "${info:-unknown}"
+        done
+    } >"$tmp"
+    chmod 0644 -- "$tmp"
+    mv -f -- "$tmp" "$state_dir/manifest.txt"
+}
+
+find_cached_archive() {
+    local wanted_version="$1" dir file
+    local -a candidates=()
+    shopt -s nullglob
+    for dir in "${cache_dirs[@]}"; do
+        [[ -d "$dir" ]] || continue
+        for file in "$dir/$pkgname-$wanted_version-"*.pkg.tar.*; do
+            [[ -f "$file" ]] || continue
+            case "$file" in
+                *.sig) continue ;;
+            esac
+            candidates+=("$file")
+        done
+    done
+    shopt -u nullglob
+    ((${#candidates[@]} > 0)) || return 1
+    printf '%s\n' "${candidates[0]}"
+}
+
+save_point() {
+    local installed current archive_version source dest
+    need_root
+    command -v pacman >/dev/null 2>&1 || die "pacman is not available"
+
+    installed="$(pacman -Q -- "$pkgname" 2>/dev/null)" ||
+        die "$pkgname is not installed; nothing to save"
+    current="${installed#* }"
+    [[ -n "$current" && "$current" != "$installed" ]] ||
+        die "cannot read the installed $pkgname version"
+    # Package archives do not carry an epoch, but pacman -Q prints one when
+    # the package has it.  Strip the epoch for the cache filename only.
+    archive_version="${current#*:}"
+
+    if ! source="$(find_cached_archive "$archive_version")"; then
+        die "no cached archive for $pkgname $current in: ${cache_dirs[*]}; copy the matching package archive into one of those directories (or use --cache-dir PATH) and rerun save"
+    fi
+    source="$(realpath -- "$source")"
+
+    install -d -m 0755 -- "$state_dir"
+    dest="$state_dir/${source##*/}"
+    if [[ -e "$dest" ]]; then
+        if [[ "$(sha256sum -- "$source" | awk '{print $1}')" != "$(sha256sum -- "$dest" | awk '{print $1}')" ]]; then
+            die "refusing to overwrite a different archive already saved as $dest"
+        fi
+        log "rollback point already saved: $dest"
+    else
+        install -m 0644 -- "$source" "$dest"
+        log "saved $pkgname $current as $dest"
+    fi
+
+    write_metadata
+    printf 'Rollback point ready: %s\n' "$dest"
+    printf 'Rollback command: sudo maria-padilha-rollback apply %s\n' "${archive_version%-*}"
+}
+
+list_points() {
+    local file size
+    local -a archives=()
+    mapfile -t archives < <(state_archives)
+    if ((${#archives[@]} == 0)); then
+        printf 'No rollback points in %s\n' "$state_dir"
+        return 0
+    fi
+    printf 'Rollback points in %s:\n' "$state_dir"
+    for file in "${archives[@]}"; do
+        size="$(du -h -- "$file" | awk '{print $1}')"
+        printf '  %-55s %s\n' "${file##*/}" "$size"
+    done
+    if [[ -f "$state_dir/SHA256SUMS" ]]; then
+        printf 'Checksums: %s\n' "$state_dir/SHA256SUMS"
+    else
+        printf 'WARNING: SHA256SUMS is missing from %s\n' "$state_dir" >&2
+    fi
+    if [[ -f "$state_dir/manifest.txt" ]]; then
+        printf 'Manifest:  %s\n' "$state_dir/manifest.txt"
+    fi
+}
+
+verify_points() {
+    local -a archives=()
+    mapfile -t archives < <(state_archives)
+    ((${#archives[@]} > 0)) || die "no saved package archives in $state_dir"
+    [[ -f "$state_dir/SHA256SUMS" ]] || die "SHA256SUMS is missing from $state_dir"
+    (cd "$state_dir" && sha256sum -c --strict SHA256SUMS)
+}
+
+apply_point() {
+    local wanted_version="$1" archive_version file
+    local -a matches=()
+    [[ -n "$wanted_version" ]] || die "apply needs a VERSION (see list)"
+    [[ "$wanted_version" =~ ^[A-Za-z0-9][A-Za-z0-9._+~:-]*$ ]] ||
+        die "invalid version: $wanted_version"
+    need_root
+    command -v pacman >/dev/null 2>&1 || die "pacman is not available"
+
+    archive_version="${wanted_version#*:}"
+    shopt -s nullglob
+    matches=("$state_dir/$pkgname-$archive_version-"*.pkg.tar.*)
+    shopt -u nullglob
+    ((${#matches[@]} > 0)) || die "no saved archive for $pkgname $wanted_version in $state_dir"
+    ((${#matches[@]} == 1)) || die "more than one saved archive matches $pkgname $wanted_version; inspect $state_dir"
+    file="${matches[0]}"
+
+    verify_points
+    log "package to install:"
+    pacman -Qp --color never -- "$file" >&2 || true
+
+    if ((dry_run)); then
+        printf 'Would run:'
+        printf ' %q' pacman -U --noconfirm "$file"
+        printf '\n'
+        return 0
+    fi
+
+    if ((assume_yes == 0)); then
+        printf 'Type the package version (%s) to confirm rollback: ' "$wanted_version"
+        local answer=""
+        read -r answer || die "no confirmation read"
+        [[ "$answer" == "$wanted_version" ]] || die "confirmation did not match; nothing changed"
+    fi
+
+    log "running pacman -U $file"
+    if ! pacman -U --noconfirm -- "$file"; then
+        die "pacman could not install the saved desktop package; read its dependency/error output instead of forcing the transaction"
+    fi
+    printf 'Rolled back %s to %s. Reboot to test the desktop.\n' "$pkgname" "$wanted_version"
+}
+
+while (($#)); do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --state-dir)
+            (($# >= 2)) || die "--state-dir needs a path"
+            state_dir="$2"
+            shift 2
+            ;;
+        --cache-dir)
+            (($# >= 2)) || die "--cache-dir needs a path"
+            cache_dirs+=("$2")
+            shift 2
+            ;;
+        --yes)
+            assume_yes=1
+            shift
+            ;;
+        --dry-run)
+            dry_run=1
+            shift
+            ;;
+        save|list|verify|apply)
+            [[ -z "$mode" ]] || die "only one command may be given"
+            mode="$1"
+            shift
+            ;;
+        -*)
+            die "unknown option: $1 (try --help)"
+            ;;
+        *)
+            [[ -z "$version" ]] || die "unexpected argument: $1"
+            version="$1"
+            shift
+            ;;
+    esac
+done
+
+[[ -n "$mode" ]] || { usage >&2; exit 2; }
+
+case "$mode" in
+    save)
+        [[ -z "$version" ]] || die "save does not take a version"
+        ((assume_yes == 0)) || die "--yes is only valid with apply"
+        ((dry_run == 0)) || die "--dry-run is only valid with apply"
+        save_point
+        ;;
+    list)
+        [[ -z "$version" ]] || die "list does not take a version"
+        ((assume_yes == 0)) || die "--yes is only valid with apply"
+        ((dry_run == 0)) || die "--dry-run is only valid with apply"
+        list_points
+        ;;
+    verify)
+        [[ -z "$version" ]] || die "verify does not take a version; it checks every saved archive"
+        ((assume_yes == 0)) || die "--yes is only valid with apply"
+        ((dry_run == 0)) || die "--dry-run is only valid with apply"
+        verify_points
+        ;;
+    apply)
+        apply_point "$version"
+        ;;
+esac

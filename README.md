@@ -10,7 +10,7 @@ the tracked configs live in
 
 ## Status
 
-**Boot/greeter branding and laptop hardware enablement.** The profile, package selection, live user, greetd/tuigreet setup, build wrapper, Plymouth theme, GRUB/syslinux menus and first-boot provisioning are in place. Laptop enablement adds AMD microcode and GPU firmware, common Wi-Fi/Bluetooth firmware, SOF/UCM audio and power/thermal tooling with automatic suspend disabled. First boot enables NetworkManager, Bluetooth, seatd, greetd and power-profiles-daemon, enables the PipeWire user stack, and populates `/etc/skel` from the tracked dotfiles without copying secrets. The offline installer layer is under
+**Boot/greeter branding, laptop hardware enablement, and recovery.** The profile, package selection, live user, greetd/tuigreet setup, build wrapper, Plymouth theme, GRUB/syslinux menus and first-boot provisioning are in place. Laptop enablement adds AMD microcode and GPU firmware, common Wi-Fi/Bluetooth firmware, SOF/UCM audio and power/thermal tooling with automatic suspend disabled. First boot enables NetworkManager, Bluetooth, seatd, greetd and power-profiles-daemon, enables the PipeWire user stack, and populates `/etc/skel` from the tracked dotfiles without copying secrets. The ISO also has a rescue boot entry with filesystem and bootloader tooling, and an explicit package rollback helper for failed desktop updates. The offline installer layer is under
 `iso/airootfs/etc/calamares/`: Calamares modules, Maria Padilha branding, an
 ISO-local package repository and a manual QEMU checklist. A GitHub Actions
 workflow now builds the `maria-padilha` package and ISO in an Arch container,
@@ -21,9 +21,11 @@ and do not treat an untested local build or an unrun CI workflow as a release.
 
 See [docs/first-boot.md](docs/first-boot.md) for the service/skel design,
 [docs/boot-branding.md](docs/boot-branding.md) for the boot/greeter palette and
-fallback design, and [docs/qemu-branding.md](docs/qemu-branding.md) for the
-manual visual checklist. The branding checks are static; they do not perform a
-graphical login.
+fallback design, [docs/rescue.md](docs/rescue.md) for entering rescue mode and
+[docs/rollback.md](docs/rollback.md) for the desktop update rollback, and
+[docs/qemu-branding.md](docs/qemu-branding.md) for the manual visual checklist.
+The branding and rescue checks are static; they do not perform a graphical
+login or boot the rescue entry.
 
 ## Laptop hardware enablement
 
@@ -51,6 +53,38 @@ maria-padilha-hardware-check
 make hardware-check                 # from this checkout, against /
 make hardware-check ROOT=/mnt       # or a mounted target
 ```
+
+## Rescue and rollback
+
+The ISO carries an explicit rescue entry in both boot menus: **Maria Padilha
+Rescue (BIOS)** under syslinux and **Maria Padilha Rescue (UEFI)** under
+systemd-boot.  It boots the same kernel and squashfs as the live desktop but
+starts a root shell on tty1 instead of greetd.  Nothing is mounted, partitioned,
+formatted or repaired automatically.  The shell includes `lsblk`/`blkid`/
+`findmnt`, ext4/FAT/Btrfs/XFS/F2FS/exFAT/NTFS tools, `parted`/`sgdisk`,
+`arch-chroot`, `grub-install`/`grub-mkconfig` and `efibootmgr`.
+
+See [docs/rescue.md](docs/rescue.md) for entering the menu, identifying and
+mounting the installed root, checking an unmounted filesystem and repairing
+GRUB for UEFI or BIOS.  The entry is gated by the
+`maria-padilha.rescue=1` kernel parameter and does not change the normal live
+boot.
+
+A failed desktop update is handled separately with an explicit, package-scoped
+rollback point.  Before updating, save the installed desktop package archive:
+
+```sh
+sudo maria-padilha-rollback save
+maria-padilha-rollback list
+maria-padilha-rollback verify
+```
+
+If the session breaks, boot the rescue entry, mount and enter the installed
+root, and run `maria-padilha-rollback apply <version>`.  The helper verifies
+`SHA256SUMS`, shows the package metadata and then runs `pacman -U` on the saved
+archive.  It is not a hidden snapshot and does not roll back the kernel or
+graphics stack; see [docs/rollback.md](docs/rollback.md) for the procedure and
+limits.
 
 ## Calamares installer
 
@@ -129,6 +163,13 @@ is downloaded or embedded.
 | `tests/hardware.sh` | hardware package/policy checks and a synthetic-root fixture |
 | `iso/efiboot/` | UEFI systemd-boot entries and menu settings |
 | `iso/syslinux/` | BIOS syslinux entries, menu palette and splash |
+| `iso/syslinux/archiso_rescue.cfg`, `iso/efiboot/loader/entries/02-maria-padilha-rescue.conf` | BIOS/UEFI rescue menu entries |
+| `iso/airootfs/etc/systemd/system/maria-padilha-rescue.service` | tty1 rescue shell, gated by `maria-padilha.rescue=1` |
+| `iso/airootfs/usr/local/bin/maria-padilha-rescue` | rescue banner, tool list and shell entry |
+| `iso/airootfs/usr/local/bin/maria-padilha-rollback` | explicit save/list/verify/apply package rollback helper |
+| `docs/rescue.md` | entering rescue mode, filesystem checks and bootloader repair |
+| `docs/rollback.md` | desktop update rollback procedure and limits |
+| `tests/rescue.sh` | rescue tools/menu wiring, documentation links and rollback fixture |
 | `build.sh` | builds `maria-padilha`, publishes it to `out/repo`, then runs `mkarchiso` |
 | `.github/workflows/iso.yml` | Arch-container package/ISO build, SHA256 artifact and opt-in QEMU smoke job |
 | `scripts/ci/build-iso.sh` | host wrapper for the privileged Arch build, checksum and build metadata |
@@ -278,6 +319,7 @@ bash tests/first-boot.sh --profile    # first-login checks against iso/airootfs
 make first-boot ROOT=/mnt             # inspect an installed root (read-only)
 bash tests/hardware.sh                # hardware package/policy checks
 make hardware-check ROOT=/mnt         # inspect a mounted target (read-only)
+bash tests/rescue.sh                  # rescue menu/tools, docs links and rollback fixture
 ```
 
 `tests/iso.sh` checks the profile files and version, required and forbidden
@@ -295,7 +337,11 @@ never reach skel. `tests/first-boot.sh` can run inside a
 chroot/systemd-nspawn (or inspect a root with `--root`) and checks ownership,
 enabled units, the session/wallpaper defaults and secrets without changing
 anything. `tests/hardware.sh` checks the laptop package/policy list and
-exercises the read-only hardware check against a synthetic root. None of these
+exercises the read-only hardware check against a synthetic root. `tests/rescue.sh`
+checks the rescue menu entries, packages, systemd unit and helpers, verifies
+that local Markdown links resolve, and exercises rollback listing/checksum
+verification with a temporary fixture; it never mounts, partitions or reformats
+a device. None of these
 tests require root, `mkarchiso`, a network or a graphical session;
 `make first-boot` and `make hardware-check` only read the target they are
 pointed at.
@@ -334,6 +380,10 @@ real build.
 - No signed ISO and no release publication. The CI workflow builds an unsigned
   ISO and SHA256 artifact; its headless QEMU smoke test is opt-in and has not
   been run in this checkout.
+- The rescue menu and rollback helper are statically verified only. No rescue
+  boot, filesystem repair, bootloader repair or package rollback has been run
+  in this checkout; see [docs/rescue.md](docs/rescue.md) and
+  [docs/rollback.md](docs/rollback.md).
 - The live session is intentionally ephemeral and has an empty live-user
   password; do not reuse this configuration for an installed system.
 - PipeWire, wallpaper/palette generation, the Quickshell process, keyring/polkit
@@ -350,8 +400,8 @@ real build.
   and hibernation are explicitly unsupported and disabled until resume is fixed
   and tested.
 
-`tests/all.sh` runs the archiso, Calamares, branding, skel, first-boot and CI
-wiring static suites. The automated QEMU smoke test checks only a serial boot
-marker and login prompt; the QEMU visual/install checklists are still manual and
-must be run against a real ISO before claiming an install or a graphical login
-screen works.
+`tests/all.sh` runs the archiso, Calamares, branding, skel, first-boot, hardware,
+rescue/rollback and CI wiring static suites. The automated QEMU smoke test checks
+only a serial boot marker and login prompt; the QEMU visual/install checklists
+are still manual and must be run against a real ISO before claiming an install
+or a graphical login screen works.

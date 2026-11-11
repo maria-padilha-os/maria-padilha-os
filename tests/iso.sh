@@ -40,6 +40,11 @@ for file in \
     iso/airootfs/usr/share/plymouth/themes/maria-padilha/maria-padilha.plymouth \
     iso/airootfs/boot/grub/themes/maria-padilha/theme.txt \
     iso/airootfs/usr/local/bin/maria-padilha-hardware-check \
+    iso/airootfs/usr/local/bin/maria-padilha-rescue \
+    iso/airootfs/usr/local/bin/maria-padilha-rollback \
+    iso/airootfs/etc/systemd/system/maria-padilha-rescue.service \
+    iso/efiboot/loader/entries/02-maria-padilha-rescue.conf \
+    iso/syslinux/archiso_rescue.cfg \
     iso/airootfs/etc/systemd/sleep.conf.d/10-maria-padilha-no-s2idle.conf \
     iso/airootfs/etc/systemd/logind.conf.d/10-maria-padilha-no-autosuspend.conf \
     iso/efiboot/loader/entries/01-maria-padilha-linux.conf \
@@ -62,7 +67,10 @@ for file in \
     docs/qemu-branding.md \
     docs/ci.md \
     tests/hardware.sh \
-    docs/supported-hardware.md; do
+    tests/rescue.sh \
+    docs/supported-hardware.md \
+    docs/rescue.md \
+    docs/rollback.md; do
     require_file "$file"
 done
 
@@ -71,8 +79,10 @@ for executable in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/s
     iso/airootfs/usr/local/bin/maria-padilha-greeter \
     tests/hardware.sh scripts/check-hardware.sh \
     scripts/ci/build-iso.sh scripts/ci/container-build.sh \
-    scripts/ci/qemu-smoke-test.sh tests/ci.sh \
-    iso/airootfs/usr/local/bin/maria-padilha-hardware-check; do
+    scripts/ci/qemu-smoke-test.sh tests/ci.sh tests/rescue.sh \
+    iso/airootfs/usr/local/bin/maria-padilha-hardware-check \
+    iso/airootfs/usr/local/bin/maria-padilha-rescue \
+    iso/airootfs/usr/local/bin/maria-padilha-rollback; do
     require_exec "$executable"
 done
 
@@ -80,8 +90,10 @@ for script in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.
     tests/branding.sh scripts/overlay-dotfiles.sh iso/profiledef.sh \
     tests/hardware.sh scripts/check-hardware.sh \
     scripts/ci/build-iso.sh scripts/ci/container-build.sh \
-    scripts/ci/qemu-smoke-test.sh tests/ci.sh \
-    iso/airootfs/usr/local/bin/maria-padilha-hardware-check; do
+    scripts/ci/qemu-smoke-test.sh tests/ci.sh tests/rescue.sh \
+    iso/airootfs/usr/local/bin/maria-padilha-hardware-check \
+    iso/airootfs/usr/local/bin/maria-padilha-rescue \
+    iso/airootfs/usr/local/bin/maria-padilha-rollback; do
     if bash -n "$script" 2>/dev/null; then
         ok "$script syntax"
     else
@@ -345,15 +357,18 @@ else
     bad "repository suite is missing a branding, skel or first-boot test"
 fi
 if grep -qF -- 'docs/qemu-branding.md' README.md &&
-    grep -qF -- 'docs/boot-branding.md' README.md; then
-    ok "README links the boot-branding design and QEMU checklist"
+    grep -qF -- 'docs/boot-branding.md' README.md &&
+    grep -qF -- 'docs/rescue.md' README.md &&
+    grep -qF -- 'docs/rollback.md' README.md; then
+    ok "README links the boot-branding, rescue and rollback docs"
 else
-    bad "README does not link the boot-branding docs"
+    bad "README does not link the boot-branding, rescue and rollback docs"
 fi
-if grep -qF -- 'tests/hardware.sh' tests/all.sh; then
-    ok "repository suite runs the hardware test"
+if grep -qF -- 'tests/hardware.sh' tests/all.sh &&
+    grep -qF -- 'tests/rescue.sh' tests/all.sh; then
+    ok "repository suite runs the hardware and rescue/rollback tests"
 else
-    bad "repository suite is missing the hardware test"
+    bad "repository suite is missing the hardware or rescue/rollback test"
 fi
 if grep -qE '^first-boot:' Makefile; then
     ok "Makefile has a first-boot target"
