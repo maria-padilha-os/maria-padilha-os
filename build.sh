@@ -314,6 +314,16 @@ prepare_profile() {
     profile_work="$work_root/profile"
     rm -rf "$profile_work"
     cp -a "$profile_src" "$profile_work"
+
+    # Calamares is live-only: append its package list to the working profile,
+    # never to the tracked iso/packages.x86_64.
+    if [[ -s "$profile_work/calamares/live-packages.x86_64" ]]; then
+        {
+            printf '\n# Live-only Calamares installer (from iso/calamares/live-packages.x86_64)\n'
+            cat "$profile_work/calamares/live-packages.x86_64"
+        } >>"$profile_work/packages.x86_64"
+    fi
+
     printf '%s\n' "$pkgver" >"$profile_work/package-version"
     cat >"$profile_work/airootfs/etc/maria-padilha-release" <<EOF
 NAME="Maria Padilha OS"
@@ -398,6 +408,16 @@ main() {
 
     prepare_repo "$pkgfile"
     prepare_profile "$pkgver"
+
+    # Stage every packagechooser group and fixed package operation into the
+    # working profile's ISO-local repository.  The output stays under
+    # .scratch/iso-build so the tracked source tree is not polluted.
+    log "staging Calamares offline software groups"
+    "$root/scripts/calamares-offline-repo.sh" \
+        --package-dir "$out_dir/repo" \
+        --output "$profile_work/airootfs/var/cache/calamares/offline-repo" ||
+        die "could not stage the Calamares offline package repository"
+
     build_iso "$pkgver"
 
     if ((keep_work == 0)); then

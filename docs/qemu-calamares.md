@@ -62,7 +62,10 @@ qemu-system-x86_64 \
 5. Keyboard: type in the test field and confirm the layout preview.
 6. Partition: choose only `out/qemu/calamares-test.qcow2`; use erase disk,
    ext4, no encryption.  Confirm the encryption controls are not offered.
-7. Software: keep the desktop group and optionally add Development tools.
+7. Software: confirm **Base system (required)** is preselected.  Select
+   **Development tools** and **Office and Mail**; unselect **Media**,
+   **Games** and **AI Tools**.  Then unselect **Base system (required)** as
+   well, to prove the mandatory group is not destructive.  Continue.
 8. User: create a test user, set a user password and a separate root password.
 9. Summary: confirm the target disk is the disposable image and the selected
    timezone/keyboard/user are correct.  Start the installation.
@@ -106,26 +109,79 @@ The hardware check is read-only.  It must not ask for a password and must not
 perform a suspend or hibernate test.  Record any `FAIL`/`SKIP` line instead of
 working around it.
 
-15. In the guest, check the installed system:
+15. In the guest, check the installed system and the selected groups:
 
 ```sh
 findmnt -no FSTYPE /
 pacman -Q maria-padilha
 pacman -Q grub efibootmgr
 pacman -Qc maria-padilha
+# Base group survived even though it was unselected in the chooser.
+pacman -Q bash hyprland greetd pipewire sof-firmware linux-firmware
+# Development and Office/Mail were selected.
+pacman -Q git neovim thunderbird libreoffice-fresh
+# Media, Games and AI Tools were not selected.
+! pacman -Q vlc
+! pacman -Q 0ad
+! pacman -Q ollama
 ```
+
+Open Thunderbird once: it must show the account setup wizard with no existing
+mail account, calendar or address book.  Selecting Office and Mail installs
+Thunderbird; it does not configure an account or credentials.
 
 16. Confirm the target did not install Calamares, and that the local repository
     still exists at `/var/cache/calamares/offline-repo`.
 17. Reboot once more and confirm the GRUB menu contains "Maria Padilha" and
     uses the candle-red/gold theme with readable fallback text.
 
+## Package-group scenarios
+
+Use a fresh disposable image for each scenario, always with `-nic none`.  A
+"select" means check the group in the Software page; "unselect" means clear it.
+
+| scenario | select | unselect | expected result |
+| --- | --- | --- | --- |
+| A: additive groups | Development, Office and Mail | Base system, Media, Games, AI Tools | Base desktop/session/hardware still installed; Thunderbird and `git` installed; VLC, 0 A.D. and Ollama absent |
+| B: base-only | nothing (clear Base system too) | Development, Media, Games, Office and Mail, AI Tools | Base desktop/session/hardware still installed; no optional package installed |
+| C: AI runtime without secrets | AI Tools | Base system, Development, Media, Games, Office and Mail | `ollama` and `llama-cpp` installed; no `thunderbird`; no API key or provider credential in the target |
+
+For scenario B, verify the base contract and the absence of optional packages:
+
+```sh
+pacman -Q bash hyprland quickshell greetd maria-padilha
+pacman -Q linux-firmware linux-firmware-amdgpu sof-firmware
+pacman -Q networkmanager bluez power-profiles-daemon upower
+! pacman -Q git thunderbird libreoffice-fresh vlc ollama
+```
+
+For scenario C, verify the assistant runtime and the no-secret rule:
+
+```sh
+pacman -Q ollama llama-cpp
+! pacman -Q thunderbird
+test ! -e ~/.config/ollama
+test ! -e ~/.ollama/config.json
+! grep -RInE 'sk-[A-Za-z0-9]{20,}|api[_-]?key[[:space:]]*=' \
+    ~/.config ~/.ollama 2>/dev/null
+```
+
+The last two checks are intentionally narrow: Ollama may create a model cache
+under `~/.ollama` after a model pull, but no model, provider account, API key or
+credential may be present immediately after installation.  A model download
+is a separate, explicit user action and is never part of group selection.
+
 ## Negative checks
 
 - Repeat with the ISO booted and `-nic none`: no step may hang on a network
   request.
-- Confirm `/etc/pacman.conf` in the target contains the
+- Confirm no online/network package source is offered on the Software page,
+  and that `/etc/pacman.conf` in the target contains the
   `[maria-padilha-offline]` stanza and points at `file://`.
+- Confirm unselecting the base group in the Software page still leaves the
+  desktop, session, shell and hardware packages installed after the reboot.
+- Confirm selecting Office and Mail does not create a Thunderbird account, and
+  selecting AI Tools does not create an API key or provider credential.
 - Confirm no LUKS/encryption option appears in the partition page.
 - Confirm cancelling during the execution phase is disabled.
 

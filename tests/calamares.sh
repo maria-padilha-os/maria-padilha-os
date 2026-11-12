@@ -100,6 +100,17 @@ def manifest_names(path):
     return names
 
 
+def package_list(path):
+    names = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            names.append(line)
+    if len(names) != len(set(names)):
+        raise AssertionError(f"{path.relative_to(root)} has duplicate packages")
+    return names
+
+
 settings = load(config / "settings.conf")
 if settings.get("branding") != "maria-padilha":
     raise AssertionError("settings.conf does not select the maria-padilha branding")
@@ -185,9 +196,21 @@ for key in ("skip_if_no_internet", "update_db", "update_system"):
 if not (packages.get("pacman") or {}).get("needed_only"):
     raise AssertionError("packages.conf should use needed_only")
 operations = packages.get("operations") or []
+if not isinstance(operations, list) or not operations:
+    raise AssertionError("packages.conf has no operations")
 installed = []
 for operation in operations:
-    installed.extend(operation.get("install") or [])
+    if not isinstance(operation, dict) or len(operation) != 1:
+        raise AssertionError("packages.conf operations must contain one action each")
+    action = next(iter(operation))
+    if action in ("remove", "try_remove"):
+        raise AssertionError("packages.conf must not remove packages: optional groups are additive")
+    if action != "install":
+        raise AssertionError(f"packages.conf has an unsupported operation: {action}")
+    entries = operation[action] or []
+    if not isinstance(entries, list) or not entries:
+        raise AssertionError("packages.conf install operations must not be empty")
+    installed.extend(entries)
 if not {"grub", "efibootmgr"} <= set(installed):
     raise AssertionError("packages.conf must install grub and efibootmgr from the ISO")
 
@@ -213,15 +236,117 @@ if not service_units["greetd.service"].get("mandatory"):
     raise AssertionError("greetd.service must be mandatory for a graphical first boot")
 
 chooser = load(modules / "packagechooser.conf")
+if chooser.get("mode") != "optionalmultiple":
+    raise AssertionError("packagechooser.conf must allow optional multiple groups")
 if chooser.get("method") != "packages":
     raise AssertionError("packagechooser.conf must hand packages to the packages module")
-if not chooser.get("items"):
+if chooser.get("default") != "base":
+    raise AssertionError("packagechooser.conf must preselect the mandatory base group")
+items = chooser.get("items") or []
+if not isinstance(items, list) or not items:
     raise AssertionError("packagechooser.conf has no items")
+
+required_ids = {"base", "development", "media", "games", "office-mail", "ai-tools"}
+items_by_id = {}
 chosen = []
-for item in chooser["items"]:
-    chosen.extend(item.get("packages") or [])
-if not chosen:
-    raise AssertionError("packagechooser.conf items install no packages")
+optional_packages = []
+package_name = re.compile(r"^[a-z0-9][a-z0-9@._+:-]*$")
+for item in items:
+    if not isinstance(item, dict):
+        raise AssertionError("packagechooser.conf items must be mappings")
+    item_id = item.get("id")
+    if not item_id:
+        raise AssertionError("packagechooser.conf item is missing an id")
+    if item_id in items_by_id:
+        raise AssertionError(f"packagechooser.conf has duplicate item id: {item_id}")
+    if not item.get("name"):
+        raise AssertionError(f"packagechooser.conf item {item_id} has no name")
+    description = item.get("description")
+    if not description:
+        raise AssertionError(f"packagechooser.conf item {item_id} has no description")
+    unknown = set(item) - {"id", "name", "description", "screenshot", "packages"}
+    if unknown:
+        raise AssertionError(
+            f"packagechooser.conf item {item_id} has unsupported keys: {sorted(unknown)}")
+    pkgs = item.get("packages") or []
+    if not isinstance(pkgs, list) or not pkgs:
+        raise AssertionError(f"packagechooser.conf item {item_id} installs no packages")
+    for pkg in pkgs:
+        if not isinstance(pkg, str) or not package_name.fullmatch(pkg):
+            raise AssertionError(
+                f"packagechooser.conf item {item_id} has an invalid package: {pkg}")
+    items_by_id[item_id] = item
+    chosen.extend(pkgs)
+    if item_id != "base":
+        optional_packages.extend(pkgs)
+
+missing_ids = required_ids - set(items_by_id)
+if missing_ids:
+    raise AssertionError(f"packagechooser.conf is missing groups: {sorted(missing_ids)}")
+if len(chosen) != len(set(chosen)):
+    raise AssertionError("packagechooser.conf reuses a package in more than one group")
+
+base_packages = set(items_by_id["base"]["packages"])
+required_base = {
+    # Desktop, session, shell and the desktop package
+    "maria-padilha", "hyprland", "quickshell", "bash",
+    "greetd", "greetd-tuigreet", "seatd",
+    # Required kernel, firmware, graphics and hardware support
+    "linux", "amd-ucode", "linux-firmware", "linux-firmware-amd",
+    "linux-firmware-amdgpu", "linux-firmware-atheros", "linux-firmware-broadcom",
+    "linux-firmware-intel", "linux-firmware-mediatek", "linux-firmware-realtek",
+    "mesa", "vulkan-radeon", "libva",
+    "sof-firmware", "alsa-ucm-conf", "pipewire", "pipewire-pulse",
+    "pipewire-alsa", "wireplumber",
+    "networkmanager", "wpa_supplicant", "iw", "wireless-regdb",
+    "bluez", "bluez-utils", "power-profiles-daemon", "upower",
+    "lm_sensors", "acpi", "pciutils", "usbutils",
+}
+missing_base = required_base - base_packages
+if missing_base:
+    raise AssertionError(
+        "the mandatory base group is missing: " + ", ".join(sorted(missing_base)))
+if not base_packages <= set(installed):
+    raise AssertionError(
+        "packages.conf does not install the mandatory base group: "
+        + ", ".join(sorted(base_packages - set(installed))))
+if set(optional_packages) & base_packages:
+    raise AssertionError("an optional group overlaps the mandatory base packages")
+
+office = set(items_by_id["office-mail"]["packages"])
+if "thunderbird" not in office:
+    raise AssertionError("the Office and Mail group must include thunderbird")
+if "account" not in items_by_id["office-mail"]["description"].lower():
+    raise AssertionError("Office and Mail must document that accounts are not configured")
+
+ai = set(items_by_id["ai-tools"]["packages"])
+if "ollama" not in ai:
+    raise AssertionError("AI Tools must include the local assistant runtime (ollama)")
+ai_description = items_by_id["ai-tools"]["description"].lower()
+for term in ("api key", "credential", "account"):
+    if term not in ai_description:
+        raise AssertionError(f"AI Tools must document that no {term} is configured")
+
+# No group definition may carry an API key, token, password or other secret.
+secret_key = re.compile(
+    r"(?i)(api[_-]?key|access[_-]?token|auth[_-]?token|secret|password|credential|private[_-]?key)")
+for item_id, item in items_by_id.items():
+    for key in item:
+        if secret_key.search(str(key)):
+            raise AssertionError(f"packagechooser.conf item {item_id} has a secret-like key: {key}")
+for config_path in (modules / "packagechooser.conf", modules / "packages.conf"):
+    text = config_path.read_text(encoding="utf-8")
+    for match in re.finditer(r"(?im)^\s*([A-Za-z0-9_-]+)\s*:", text):
+        if secret_key.search(match.group(1)):
+            raise AssertionError(
+                f"{config_path.relative_to(root)} has a secret-like key: {match.group(1)}")
+    for pattern in (
+        r"sk-[A-Za-z0-9]{20,}",
+        r"ghp_[A-Za-z0-9]{20,}",
+        r"BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY",
+    ):
+        if re.search(pattern, text):
+            raise AssertionError(f"{config_path.relative_to(root)} looks like it contains a secret")
 
 manifest = manifest_names(manifest_path)
 missing_manifest = (set(installed) | set(chosen)) - set(manifest)
@@ -231,6 +356,15 @@ if missing_manifest:
 live_manifest = manifest_names(live_manifest_path)
 if "calamares" not in live_manifest:
     raise AssertionError("calamares is not in the live package list")
+
+# The base group must already be present in the squashfs so an offline install
+# has it even if every optional group is cleared.
+live_packages = set(package_list(root / "iso/packages.x86_64"))
+missing_live_base = base_packages - live_packages
+if missing_live_base:
+    raise AssertionError(
+        "the base group is not carried by the live ISO: "
+        + ", ".join(sorted(missing_live_base)))
 
 shellprocess = load(modules / "shellprocess.conf")
 script = shellprocess.get("script") or []
@@ -422,6 +556,15 @@ else
     bad "offline repository manifest check"
 fi
 
+if grep -qF 'calamares-offline-repo.sh' build.sh &&
+    grep -qF 'offline-repo' build.sh &&
+    grep -qF 'calamares/live-packages.x86_64' build.sh
+then
+    ok "build.sh stages the offline groups and the live-only installer"
+else
+    bad "build.sh does not wire the Calamares offline groups into the ISO"
+fi
+
 for doc in docs/calamares.md docs/qemu-calamares.md; do
     if grep -qi 'qemu' "$doc"; then
         ok "QEMU checklist referenced from $doc"
@@ -436,6 +579,27 @@ then
     ok "QEMU commands documented in docs/qemu-calamares.md"
 else
     bad "QEMU commands missing from docs/qemu-calamares.md"
+fi
+
+if grep -qi 'thunderbird' docs/calamares.md &&
+    grep -qi 'ai tools\|assistant runtime' docs/calamares.md &&
+    grep -qi 'api key' docs/calamares.md &&
+    grep -qi 'credential' docs/calamares.md &&
+    grep -qiE 'does .*not.*configure|not configure' docs/calamares.md
+then
+    ok "docs describe Thunderbird, the AI runtime and the no-account/no-secret policy"
+else
+    bad "docs are missing the Office/Mail, AI Tools or no-account/no-secret policy"
+fi
+
+if grep -qiE 'unselect|deselect|clear' docs/qemu-calamares.md &&
+    grep -qi 'package-group scenarios\|group scenarios' docs/qemu-calamares.md &&
+    grep -q 'pacman -Q thunderbird' docs/qemu-calamares.md &&
+    grep -q 'pacman -Q ollama' docs/qemu-calamares.md
+then
+    ok "QEMU checklist covers selecting and unselecting package groups"
+else
+    bad "QEMU checklist is missing the package-group select/unselect procedure"
 fi
 
 if grep -qi 'not been executed\|not been tested\|no full install has been run' docs/qemu-calamares.md; then

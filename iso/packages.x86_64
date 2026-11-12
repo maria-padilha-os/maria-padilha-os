@@ -5,6 +5,7 @@
 # Base system and archiso boot support
 base
 linux
+bash
 mkinitcpio-archiso
 plymouth
 squashfs-tools

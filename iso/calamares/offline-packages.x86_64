@@ -1,9 +1,8 @@
 # Packages staged into the ISO-local repository for target installation.
 #
 # Keep this list aligned with:
-#   - the fixed operations in modules/packages.conf (grub, efibootmgr)
-#   - the default packagechooser item (maria-padilha)
-#   - the optional packagechooser groups (base-devel, git, neovim)
+#   - the fixed operations in modules/packages.conf (base group, grub, efibootmgr)
+#   - every item in modules/packagechooser.conf
 #
 # The maria-padilha package is built from maria-padilha-de; pass the directory
 # containing the built archive to scripts/calamares-offline-repo.sh with
@@ -11,10 +10,139 @@
 #
 # cryptsetup/LUKS is intentionally absent: modules/partition.conf disables
 # LUKS because the image does not carry the full encrypted-root stack.
-maria-padilha
-grub
-efibootmgr
+#
+# Group names are prefixed with @ so the staging helper expands them.
+
+# Mandatory base group
+@base
+linux
+mkinitcpio-archiso
 plymouth
+bash
+amd-ucode
+intel-ucode
+linux-firmware
+linux-firmware-amd
+linux-firmware-amdgpu
+linux-firmware-atheros
+linux-firmware-broadcom
+linux-firmware-intel
+linux-firmware-mediatek
+linux-firmware-realtek
+mesa
+vulkan-radeon
+libva
+libva-utils
+networkmanager
+wpa_supplicant
+wireless-regdb
+iw
+bluez
+bluez-utils
+seatd
+power-profiles-daemon
+upower
+lm_sensors
+acpi
+pciutils
+usbutils
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+alsa-utils
+alsa-ucm-conf
+sof-firmware
+pavucontrol
+hyprland
+quickshell
+qt6-base
+qt6-declarative
+qt6-wayland
+qt6-svg
+xdg-desktop-portal
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+xdg-utils
+xdg-user-dirs
+polkit
+polkit-gnome
+gnome-keyring
+gsettings-desktop-schemas
+hyprlock
+hypridle
+hyprsunset
+playerctl
+grim
+slurp
+swappy
+wl-clipboard
+cliphist
+fuzzel
+brightnessctl
+jq
+micro
+ttf-jetbrains-mono-nerd
+ttf-nerd-fonts-symbols
+noto-fonts
+noto-fonts-emoji
+otf-font-awesome
+ttf-dejavu
+greetd
+greetd-tuigreet
+sudo
+maria-padilha
+
+# Optional group: development
 @base-devel
 git
 neovim
+python
+python-pip
+nodejs
+npm
+rust
+go
+clang
+cmake
+ninja
+gdb
+
+# Optional group: media
+vlc
+mpv
+ffmpeg
+gst-plugins-base
+gst-plugins-good
+gst-plugins-bad
+gst-plugins-ugly
+gst-libav
+imagemagick
+gimp
+obs-studio
+yt-dlp
+
+# Optional group: games
+0ad
+supertuxkart
+luanti
+lutris
+wine
+gamemode
+mangohud
+vulkan-tools
+
+# Optional group: office-mail
+libreoffice-fresh
+thunderbird
+hunspell-en_us
+hyphen-en
+mythes-en
+
+# Optional group: ai-tools
+ollama
+llama-cpp
+
+# Bootloader packages installed by the fixed operations in packages.conf
+grub
+efibootmgr

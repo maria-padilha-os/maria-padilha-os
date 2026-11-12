@@ -90,9 +90,13 @@ limits.
 
 The installer is designed to work without a network: the target root comes from
 the ISO squashfs and extra packages come from the ISO-local pacman repository.
-See [docs/calamares.md](docs/calamares.md) for the design and
+The Software page offers a mandatory base group plus optional Development,
+Media, Games, Office/Mail and AI Tools groups.  Office/Mail includes
+Thunderbird; AI Tools includes the local assistant runtime but no API key or
+credential.  Selecting a group installs software only and does not configure
+accounts.  See [docs/calamares.md](docs/calamares.md) for the design and
 [docs/qemu-calamares.md](docs/qemu-calamares.md) for the manual acceptance
-checklist.
+checklist, including the group select/unselect scenarios.
 
 | path | role |
 | --- | --- |

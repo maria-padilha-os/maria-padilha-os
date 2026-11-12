@@ -53,6 +53,37 @@ installs the selected packages and the bootloader, then unmounts.
   desktop configs without secrets.  See [first-boot.md](first-boot.md) for what
   finishes at the first graphical login.
 
+## Software groups
+
+The **Software** page is an offline `packagechooser` list.  The base group is
+mandatory: `packagechooser.conf` preselects it, and the fixed operations in
+`packages.conf` install the same package list, so clearing every selection in
+the list-view cannot remove the desktop, session, shell or hardware support.
+There are no `remove` or `try_remove` operations in `packages.conf`; optional
+groups are strictly additive.
+
+| group | id | contents |
+| --- | --- | --- |
+| Base system (required) | `base` | Maria Padilha desktop, Hyprland/Quickshell session, Bash, greetd, PipeWire audio, NetworkManager/Bluetooth, microcode, firmware, graphics and laptop hardware packages |
+| Development tools | `development` | `base-devel`, git, Neovim, Python, Node.js, Rust, Go, compiler and debugger tooling |
+| Media | `media` | VLC, mpv, FFmpeg/GStreamer, GIMP, ImageMagick, OBS Studio, yt-dlp |
+| Games | `games` | 0 A.D., SuperTuxKart, Luanti, Lutris, Wine, GameMode, MangoHud, Vulkan tools |
+| Office and Mail | `office-mail` | LibreOffice, **Thunderbird** and English spelling tools |
+| AI Tools | `ai-tools` | The local assistant runtime: **Ollama** and llama.cpp |
+
+Selecting a group installs software only.  It does **not** configure mail
+accounts, calendars, address books, game-store or streaming accounts, online
+services, AI provider accounts, API keys or any other credential.  Thunderbird
+starts with no configured mail account, and the AI group contains no key,
+token or provider secret.  Models, accounts and any online service setup remain
+explicit user decisions after installation.
+
+Every group is resolved from the ISO-local repository.  No online package
+source is offered; there is no opt-in network path, `netinstall` module or
+mirror fallback.  The `packages` module keeps `update_db` and `update_system`
+false, so an install that is offline from start to finish cannot make a
+network request.
+
 ## Offline package repository
 
 The build host may use the network.  The installed system does not:
@@ -79,15 +110,27 @@ Server = file:///var/cache/calamares/offline-repo
 ```
 
 `modules/packages.conf` keeps `update_db` and `update_system` false, so pacman
-never synchronizes with a mirror.  `packagechooser.conf` offers the desktop and
-an optional development group; both are resolved from the same local
-repository.  Keep the manifest, the fixed `packages.conf` operations and the
-packagechooser groups aligned when changing package selection.
+never synchronizes with a mirror.  `packagechooser.conf` offers the mandatory
+base group and the optional Development, Media, Games, Office/Mail and AI Tools
+groups; every group is resolved from the same local repository.  The manifest
+covers every package named by the chooser and by the fixed operations, so a
+selection cannot pull from a mirror.  `build.sh` runs the helper into the
+build's working profile after `prepare_repo`, immediately before `mkarchiso`:
 
-Laptop hardware support is not a packagechooser group.  Microcode, firmware,
-audio and power/thermal packages are in `iso/packages.x86_64`, so they arrive
-in the target through the live squashfs and are available on the first offline
-boot.  See [supported-hardware.md](supported-hardware.md).
+```sh
+scripts/calamares-offline-repo.sh \
+    --package-dir out/repo \
+    --output .scratch/iso-build/profile/airootfs/var/cache/calamares/offline-repo
+```
+
+Keep the manifest, the fixed `packages.conf` operations and the
+`packagechooser.conf` groups aligned when changing package selection.
+
+Laptop hardware support is part of the mandatory base group.  Microcode,
+firmware, audio and power/thermal packages are listed in both `base` and
+`iso/packages.x86_64`, so they arrive in the target through the live squashfs
+and are also resolvable from the offline repository.  See
+[supported-hardware.md](supported-hardware.md).
 
 The repository is deliberately retained in the target so `pacman` can install
 from it later without a network.  Add or remove packages by rebuilding the ISO,
@@ -116,10 +159,13 @@ bash tests/all.sh         # repository suite
 
 `tests/calamares.sh` parses every YAML config when PyYAML is available, checks
 the module sequence, the ext4/no-LUKS partition policy, the no-network package
-settings, the enabled system units, the branding files and palette, the offline
-helper manifest, and the shell scripts.  It is a configuration test, not an
-installation test.  First-boot ownership and service checks live in
-`tests/first-boot.sh` and are documented in [first-boot.md](first-boot.md).
+settings, the group ids and required packages, Thunderbird in Office/Mail, the
+local assistant runtime in AI Tools, the absence of secret-like keys, the
+base-group guarantee in `packages.conf`, the enabled system units, the branding
+files and palette, the offline helper manifest, and the shell scripts.  It is a
+configuration test, not an installation test.  First-boot ownership and service
+checks live in `tests/first-boot.sh` and are documented in
+[first-boot.md](first-boot.md).
 
 ## Manual QEMU checklist
 

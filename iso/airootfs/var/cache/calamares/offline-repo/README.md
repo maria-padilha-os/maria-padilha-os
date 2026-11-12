@@ -8,6 +8,8 @@ database here with `scripts/calamares-offline-repo.sh`.  Archives, databases
 and signatures are build artifacts and are ignored by git; only this README
 and the directory's `.gitignore` are tracked.
 
-Keep `iso/calamares/offline-packages.x86_64` and the operations in
-`iso/airootfs/etc/calamares/modules/packages.conf` in sync.  If a package is
-selected by `packagechooser.conf`, it must be listed in the manifest too.
+Keep `iso/calamares/offline-packages.x86_64`, the operations in
+`iso/airootfs/etc/calamares/modules/packages.conf` and every group in
+`packagechooser.conf` in sync.  If a package is selected by any group, it must
+be listed in the manifest too.  The mandatory base group is installed by both
+the chooser and the fixed operations, and optional groups are additive only.

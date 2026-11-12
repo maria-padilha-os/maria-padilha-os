@@ -6,16 +6,17 @@ the live root by archiso.
 
 ## Live root packages
 
-Append `live-packages.x86_64` to the archiso package list when the profile is
-present:
+`build.sh` appends `live-packages.x86_64` to the working profile's package list
+while preparing the ISO, so the tracked `iso/packages.x86_64` stays free of the
+live-only installer.  That adds `calamares` only.  The installer's runtime
+dependencies are pulled by pacman during the ISO build; nothing is installed
+into the target just because it is in the live root.
+
+For a manual profile build outside `build.sh`, append the list yourself:
 
 ```sh
 cat iso/calamares/live-packages.x86_64 >> iso/packages.x86_64
 ```
-
-That adds `calamares` only.  The installer's runtime dependencies are pulled by
-pacman during the ISO build; nothing is installed into the target just because
-it is in the live root.
 
 ## Offline target repository
 
@@ -35,11 +36,14 @@ The helper:
 2. downloads the packages and dependencies named in
    `offline-packages.x86_64` into a scratch cache,
 3. runs `repo-add` to write
-   `iso/airootfs/var/cache/calamares/offline-repo/maria-padilha-offline.db.tar.gz`.
+   `maria-padilha-offline.db.tar.gz` in `--output`.
 
-Run it before `mkarchiso`; the archives then become part of `airootfs.sfs`.
-At install time `modules/shellprocess.conf` links that database into the target
-and adds:
+`build.sh` runs the helper with the working profile's
+`airootfs/var/cache/calamares/offline-repo` as `--output`, so the archives
+become part of `airootfs.sfs` without modifying the tracked tree.  To stage the
+repository by hand, run the command above from the repository root; it writes
+to `iso/airootfs/var/cache/calamares/offline-repo/` by default.  At install
+time `modules/shellprocess.conf` links that database into the target and adds:
 
 ```ini
 [maria-padilha-offline]
@@ -50,3 +54,19 @@ Server = file:///var/cache/calamares/offline-repo
 `modules/packages.conf` sets `update_db: false` and `update_system: false`, so
 no mirror is contacted.  The target keeps the local repository for later
 offline package installs.
+
+## Software groups
+
+`iso/airootfs/etc/calamares/modules/packagechooser.conf` defines the mandatory
+`base` group and the optional `development`, `media`, `games`, `office-mail`
+and `ai-tools` groups.  Office/Mail includes Thunderbird.  AI Tools includes the
+local assistant runtime (Ollama and llama.cpp) but no API key, provider account
+or credential; selecting any group does not configure accounts.
+
+`build.sh` calls `scripts/calamares-offline-repo.sh` with the build's working
+profile as `--output`, so the staged archives and database are copied into that
+profile rather than dirtying the tracked source tree.  The manifest must cover
+every package in every chooser group and every fixed operation in
+`packages.conf`; `tests/calamares.sh` enforces that contract.  The base group is
+also installed by fixed `packages.conf` operations and has no removal path, so
+an optional selection cannot take it away.

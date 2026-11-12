@@ -114,10 +114,11 @@ report before they are promoted to tested:
 | `iso/airootfs/usr/local/bin/maria-padilha-hardware-check` | read-only check for a running image |
 
 The package list is installed into the live root and therefore carried into the
-Calamares target by the squashfs unpack.  The hardware support is not an
-optional add-on group: a laptop missing firmware on first boot cannot install
-it from an offline image.  The Calamares package chooser still has the desktop
-and development groups for optional software.
+Calamares target by the squashfs unpack.  The hardware support is part of the
+mandatory `base` group in the Calamares chooser: a laptop missing firmware on
+first boot cannot install it from an offline image, and unselecting optional
+software must never remove it.  The Development, Media, Games, Office/Mail and
+AI Tools groups are optional additions; see [calamares.md](calamares.md).
 
 ## Checking a running image
 
