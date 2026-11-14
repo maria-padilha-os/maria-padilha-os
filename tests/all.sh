@@ -58,4 +58,10 @@ else
   echo "FAIL tests/ci.sh"
   fail=1
 fi
+if bash tests/release.sh; then
+  echo "ok tests/release.sh"
+else
+  echo "FAIL tests/release.sh"
+  fail=1
+fi
 [ "$fail" -eq 0 ]

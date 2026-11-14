@@ -57,8 +57,12 @@ for file in \
     scripts/ci/container-build.sh \
     scripts/ci/qemu-smoke-test.sh \
     .github/workflows/iso.yml \
+    .github/RELEASE_TEMPLATE.md \
     iso/airootfs/etc/systemd/system/maria-padilha-ci-boot-marker.service \
+    tools/release.sh \
+    CHANGELOG.md \
     tests/ci.sh \
+    tests/release.sh \
     tests/first-boot.sh \
     tests/skel.sh \
     tests/branding.sh \
@@ -66,6 +70,7 @@ for file in \
     docs/boot-branding.md \
     docs/qemu-branding.md \
     docs/ci.md \
+    docs/release-checklist.md \
     tests/hardware.sh \
     tests/rescue.sh \
     docs/supported-hardware.md \
@@ -80,6 +85,7 @@ for executable in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/s
     tests/hardware.sh scripts/check-hardware.sh \
     scripts/ci/build-iso.sh scripts/ci/container-build.sh \
     scripts/ci/qemu-smoke-test.sh tests/ci.sh tests/rescue.sh \
+    tests/release.sh tools/release.sh \
     iso/airootfs/usr/local/bin/maria-padilha-hardware-check \
     iso/airootfs/usr/local/bin/maria-padilha-rescue \
     iso/airootfs/usr/local/bin/maria-padilha-rollback; do
@@ -91,6 +97,7 @@ for script in build.sh tests/all.sh tests/iso.sh tests/first-boot.sh tests/skel.
     tests/hardware.sh scripts/check-hardware.sh \
     scripts/ci/build-iso.sh scripts/ci/container-build.sh \
     scripts/ci/qemu-smoke-test.sh tests/ci.sh tests/rescue.sh \
+    tests/release.sh tools/release.sh \
     iso/airootfs/usr/local/bin/maria-padilha-hardware-check \
     iso/airootfs/usr/local/bin/maria-padilha-rescue \
     iso/airootfs/usr/local/bin/maria-padilha-rollback; do

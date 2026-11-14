@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: all test iso package ci-iso smoke-test prereqs first-boot hardware-check clean
+.PHONY: all test iso package ci-iso smoke-test release prereqs first-boot hardware-check clean
 
 all: test
 
@@ -29,6 +29,12 @@ smoke-test:
 package:
 	./build.sh --package-only
 
+# Build, checksum and optionally sign a release under out/release/. Never
+# publishes; follow docs/release-checklist.md. Usage:
+#   make release ARGS='--version 0.2.0'
+release:
+	./tools/release.sh $(ARGS)
+
 # Print the host/container prerequisites; does not modify the host.
 prereqs:
 	@printf '%s\n' \
@@ -49,5 +55,7 @@ first-boot:
 hardware-check:
 	bash scripts/check-hardware.sh --root "$${ROOT:-/}"
 
+# Keep staged releases under out/release/ so rollback material survives a
+# clean build tree.
 clean:
-	rm -rf out .scratch/iso-build
+	rm -rf out/*.iso out/*.sha256 out/*.sha256.asc out/build-info.txt out/repo out/qemu-smoke .scratch/iso-build

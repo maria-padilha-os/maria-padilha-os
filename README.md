@@ -303,6 +303,29 @@ on every push. See [docs/ci.md](docs/ci.md) for the artifact names, pinning
 variables, cache policy and runner limits. A smoke-enabled build must be made
 before `make smoke-test` will find a serial login prompt.
 
+## Releases
+
+`tools/release.sh` is the local release gate. It builds the ISO through the
+same Docker/Podman wrapper (or stages an existing ISO), writes and verifies
+`SHA256SUMS`, and signs the checksum file when a maintainer key is configured:
+
+```sh
+# build, checksum and sign under out/release/<version>/
+MARIA_PADILHA_GPG_KEY='FINGERPRINT' tools/release.sh --version 0.2.0
+
+# or checksum/sign an ISO that was already built
+tools/release.sh --version 0.2.0 --iso out/maria-padilha-0.2.0-x86_64.iso
+```
+
+The output directory contains the ISO, `SHA256SUMS`, optional
+`SHA256SUMS.asc`, `build-info.txt` and a draft `release-notes.md` rendered from
+`.github/RELEASE_TEMPLATE.md`. The script never tags, uploads, publishes a
+GitHub release or deploys Pages; those are explicit human actions. Follow
+[docs/release-checklist.md](docs/release-checklist.md) for the version bump,
+changelog, checksum verification, manual draft release and rollback to the
+previous ISO. Keep previous `out/release/<version>/` directories; `make clean`
+preserves them.
+
 ## Package version
 
 `maria-padilha-de/packaging/PKGBUILD` is the source of truth. This repository
@@ -319,6 +342,7 @@ bash tests/all.sh                     # full static suite
 make test                             # same
 bash tests/branding.sh                # boot/greeter paths, sizes and fallback
 bash tests/ci.sh                      # CI workflow, artifact and smoke wiring
+bash tests/release.sh                 # checksum, signing wiring and release args
 bash tests/first-boot.sh --profile    # first-login checks against iso/airootfs
 make first-boot ROOT=/mnt             # inspect an installed root (read-only)
 bash tests/hardware.sh                # hardware package/policy checks
@@ -331,7 +355,10 @@ package names, executable bits, system and user service enablement, the skel
 shell setup, greetd/session discovery, boot entries, the mkinitcpio archiso
 hook, no `.env`, and obvious API/private-key patterns. `tests/ci.sh` checks the
 workflow, checksum/artifact wiring, safe pacman cache, opt-in smoke policy and
-the serial boot marker without starting Docker, mkarchiso or QEMU. `tests/branding.sh`
+the serial boot marker without starting Docker, mkarchiso or QEMU. `tests/release.sh`
+exercises `tools/release.sh --help`, argument validation, checksum generation,
+`--force` replacement and optional signing with a stub GPG, and checks that no
+workflow publishes a release. `tests/branding.sh`
 checks the Plymouth theme wiring, PNG dimensions, syslinux/GRUB styling,
 `plymouth` package and hook, kernel `splash` parameters, the greeter wrapper,
 and the no-palette/malformed-palette fallback without starting a graphical
@@ -381,9 +408,11 @@ real build.
   checklist in [docs/qemu-branding.md](docs/qemu-branding.md) has not been run,
   so the syslinux, Plymouth, GRUB and greeter screens are not yet visually
   confirmed.
-- No signed ISO and no release publication. The CI workflow builds an unsigned
-  ISO and SHA256 artifact; its headless QEMU smoke test is opt-in and has not
-  been run in this checkout.
+- No signed ISO and no release publication have happened. The CI workflow
+  builds an unsigned ISO and SHA256 artifact; its headless QEMU smoke test is
+  opt-in and has not been run in this checkout. `tools/release.sh` can stage a
+  signed local release, but a maintainer key and the manual checklist steps are
+  still required before publishing anything.
 - The rescue menu and rollback helper are statically verified only. No rescue
   boot, filesystem repair, bootloader repair or package rollback has been run
   in this checkout; see [docs/rescue.md](docs/rescue.md) and
@@ -405,7 +434,8 @@ real build.
   and tested.
 
 `tests/all.sh` runs the archiso, Calamares, branding, skel, first-boot, hardware,
-rescue/rollback and CI wiring static suites. The automated QEMU smoke test checks
-only a serial boot marker and login prompt; the QEMU visual/install checklists
-are still manual and must be run against a real ISO before claiming an install
-or a graphical login screen works.
+rescue/rollback, CI and release-tooling static suites. The automated QEMU smoke
+test checks only a serial boot marker and login prompt; the QEMU
+visual/install checklists are still manual and must be run against a real ISO
+before claiming an install or a graphical login screen works. No test publishes
+a release.
