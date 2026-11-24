@@ -1,5 +1,7 @@
 # Maria Padilha OS
 
+[![❤ Sponsor on GitHub](https://img.shields.io/badge/%E2%9D%A4%20Sponsor-GitHub-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Mateus-M-Reis)
+
 The bootable Arch-based Maria Padilha image: Hyprland, Quickshell, the
 `maria-padilha` package, and the tracked dotfiles.
 
