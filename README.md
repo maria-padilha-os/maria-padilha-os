@@ -17,9 +17,12 @@ the tracked configs live in
 ISO-local package repository and a manual QEMU checklist. A GitHub Actions
 workflow now builds the `maria-padilha` package and ISO in an Arch container,
 records the SHA256 and offers an opt-in headless QEMU smoke boot; see
-[docs/ci.md](docs/ci.md). No bootable ISO has been built or booted in this
-checkout and **no full install has been run**. Do not install this on a host,
-and do not treat an untested local build or an unrun CI workflow as a release.
+[docs/ci.md](docs/ci.md). The 0.2.0 ISO has been built and checksummed in this
+checkout; see
+[docs/release-evidence-0.2.0.md](docs/release-evidence-0.2.0.md). It has not
+been booted or installed here, and **no full install has been run**. Do not
+install this on a host, and do not treat an untested local build or an unrun CI
+workflow as a release.
 
 See [docs/first-boot.md](docs/first-boot.md) for the service/skel design,
 [docs/boot-branding.md](docs/boot-branding.md) for the boot/greeter palette and
@@ -179,7 +182,7 @@ is downloaded or embedded.
 | `build.sh` | builds `maria-padilha`, publishes it to `out/repo`, then runs `mkarchiso` |
 | `.github/workflows/iso.yml` | Arch-container package/ISO build, SHA256 artifact and opt-in QEMU smoke job |
 | `scripts/ci/build-iso.sh` | host wrapper for the privileged Arch build, checksum and build metadata |
-| `scripts/ci/container-build.sh` | in-container prerequisites and AUR-only `libcava` bootstrap |
+| `scripts/ci/container-build.sh` | in-container prerequisites plus AUR-only `libcava` and `calamares` bootstrap |
 | `scripts/ci/qemu-smoke-test.sh` | headless serial boot, boot-marker/login check and panic detection |
 | `docs/ci.md` | CI inputs, artifacts, cache policy and runner/artifact limits |
 | `tests/iso.sh` | static profile, package, permission, version and secret checks |
@@ -279,9 +282,14 @@ checksum and `build-info.txt` as artifacts. It does not publish a release.
 
 Package downloads are cached under `.ci/cache/pacman`; the pacman database,
 build trees, secrets and ISOs are not cached. `libcava` is currently AUR-only,
-so `scripts/ci/container-build.sh` builds it with `makepkg` and feeds it to the
-ISO-local repository; the AUR source/package itself is not cached. The build
-wrapper is `scripts/ci/build-iso.sh`, which never runs `sudo` on the host:
+and this Arch snapshot no longer packages `calamares`, so
+`scripts/ci/container-build.sh` builds both with `makepkg` and feeds them to the
+ISO-local repository; Calamares is built with its `packagechooser` module kept
+enabled because the Maria Padilha settings use it. `build.sh` also installs the
+Qt6 ShaderTools headers required by the pinned desktop CMake project but not
+declared in its `makedepends`. The AUR source/packages themselves are not
+cached. The build wrapper is `scripts/ci/build-iso.sh`, which never runs
+`sudo` on the host:
 
 ```sh
 make ci-iso          # or: bash scripts/ci/build-iso.sh
@@ -403,18 +411,19 @@ real build.
 
 ## Known gaps
 
-- A bootable ISO has not been built yet.
-- Calamares/offline installation is configured, but the QEMU acceptance
-  checklist has not been run, so first boot is not yet proven end to end.
+- Calamares/offline installation is configured and included in the built
+  0.2.0 ISO, but the QEMU acceptance checklist has not been run, so first boot
+  is not yet proven end to end.
 - The boot/greeter branding is statically verified only. The QEMU visual
   checklist in [docs/qemu-branding.md](docs/qemu-branding.md) has not been run,
   so the syslinux, Plymouth, GRUB and greeter screens are not yet visually
   confirmed.
-- No signed ISO and no release publication have happened. The CI workflow
-  builds an unsigned ISO and SHA256 artifact; its headless QEMU smoke test is
-  opt-in and has not been run in this checkout. `tools/release.sh` can stage a
-  signed local release, but a maintainer key and the manual checklist steps are
-  still required before publishing anything.
+- An unsigned 0.2.0 ISO and SHA256 artifact now exist, but no signed ISO and no
+  release publication have happened. The CI workflow builds an unsigned ISO
+  and SHA256 artifact; its headless QEMU smoke test is opt-in and has not been
+  run in this checkout. `tools/release.sh` can stage a signed local release,
+  but a maintainer key and the manual checklist steps are still required before
+  publishing anything.
 - The rescue menu and rollback helper are statically verified only. No rescue
   boot, filesystem repair, bootloader repair or package rollback has been run
   in this checkout; see [docs/rescue.md](docs/rescue.md) and

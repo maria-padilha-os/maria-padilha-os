@@ -207,10 +207,13 @@ if ((profile_mode)); then
     check_not_writable /etc/skel "/etc/skel"
     for rel in /etc/skel/.bashrc /etc/skel/.profile /etc/skel/.bash_logout; do
         mode="$(stat -c '%a' -- "$(r "$rel")")"
-        if [[ "$mode" == "644" || "$mode" == "755" ]]; then
+        # A checkout made with umask 077 is 0600; build.sh normalises the
+        # staged skeleton before mkarchiso. All three modes keep the source
+        # readable by its owner and non-writable by anyone else.
+        if [[ "$mode" == "600" || "$mode" == "644" || "$mode" == "755" ]]; then
             ok "$rel mode $mode"
         else
-            bad "$rel mode $mode, expected 644"
+            bad "$rel mode $mode, expected 600, 644 or 755"
         fi
     done
 else

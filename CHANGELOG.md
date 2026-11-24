@@ -13,6 +13,19 @@ how an `Unreleased` section becomes a versioned release.
   maintainer GPG key.
 - Manual GitHub draft-release template and a release/rollback checklist. No
   workflow tags, uploads or publishes a release automatically.
+- The first built Maria Padilha OS 0.2.0 ISO, with checksum and build evidence
+  in `docs/release-evidence-0.2.0.md`.
+
+### Fixed
+
+- `build.sh` now parses the tab-indented `depends`/`makedepends` keys from
+  `makepkg --printsrcinfo`, installs the Qt6 ShaderTools headers used by the
+  pinned desktop CMake project, and normalises staged profile modes.
+- The profile now sets `kernel_params_x86_64`, the variable current mkarchiso
+  reads, so `quiet splash` reaches the boot entries.
+- The container build bootstraps AUR Calamares (with its `packagechooser`
+  module enabled) because the current Arch repositories no longer ship it, and
+  detects an existing reusable `[ci-aur]` repository without skipping it.
 
 ## [0.2.0] - 2026-11-10
 

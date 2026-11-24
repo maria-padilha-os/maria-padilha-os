@@ -243,13 +243,23 @@ build_package() {
     chown -R "$build_user:$build_user" "$pkgwork"
     srcinfo="$(as_builder "cd $(printf '%q' "$pkgwork") && BUILDDIR=$(printf '%q' "$pkgwork/build") SRCDEST=$(printf '%q' "$pkgwork/src") makepkg --printsrcinfo -p PKGBUILD")" ||
         die "makepkg --printsrcinfo failed"
-    pkgbase="$(awk -F' = ' '$1 == "pkgbase" { print $2; exit }' <<<"$srcinfo")"
+    # makepkg indents most SRCINFO keys with a tab; trim the key before
+    # comparing it, or depends/makedepends are silently skipped and the
+    # package build fails on missing headers and libraries.
+    pkgbase="$(awk -F' = ' '{ sub(/^[[:space:]]+/, "", $1) } $1 == "pkgbase" { print $2; exit }' <<<"$srcinfo")"
     [[ "$pkgbase" == "maria-padilha" ]] ||
         die "PKGBUILD is for '$pkgbase', expected maria-padilha"
 
-    mapfile -t deps < <(awk -F' = ' '$1 == "depends" || $1 == "makedepends" { print $2 }' <<<"$srcinfo")
+    mapfile -t deps < <(awk -F' = ' '{ sub(/^[[:space:]]+/, "", $1) } $1 == "depends" || $1 == "makedepends" { print $2 }' <<<"$srcinfo")
+    # The pinned maria-padilha 0.2.0 CMake project requires Qt6 ShaderTools,
+    # but its PKGBUILD does not declare qt6-shadertools in makedepends yet.
+    # Install it here so the release package still builds from the pinned tag.
+    local -a extra_build_deps=()
+    if [[ "$pkgbase" == "maria-padilha" ]]; then
+        extra_build_deps+=(qt6-shadertools)
+    fi
     log "installing build dependencies in the container (not in the ISO root)"
-    pacman -S --needed --noconfirm --asdeps base-devel "${deps[@]}" ||
+    pacman -S --needed --noconfirm --asdeps base-devel "${deps[@]}" "${extra_build_deps[@]}" ||
         die "could not install package build dependencies"
 
     as_builder "cd $(printf '%q' "$pkgwork") && BUILDDIR=$(printf '%q' "$pkgwork/build") SRCDEST=$(printf '%q' "$pkgwork/src") PKGDEST=$(printf '%q' "$pkgwork/out") makepkg -f --nocheck --nodeps" ||
@@ -291,6 +301,16 @@ prepare_repo() {
 # The helper copies hypr, quickshell, nvim, wezterm, micro and the static mc
 # files.  It never copies hypr/hyprland/env.local.lua, key material, .env or
 # other credentials; see scripts/overlay-dotfiles.sh.
+# A checkout made with a restrictive umask can carry 0600 files. Normalise the
+# staged profile so the live root gets readable configs and executable scripts;
+# mkarchiso still applies the explicit file_permissions from profiledef.sh.
+normalize_profile_modes() {
+    local profile="$1"
+    find "$profile/airootfs" -type d -exec chmod 0755 {} +
+    find "$profile/airootfs" -type f -perm /111 -exec chmod 0755 {} +
+    find "$profile/airootfs" -type f ! -perm /111 -exec chmod 0644 {} +
+}
+
 overlay_dotfiles() {
     local profile="$1" skel
     local dotdir="$dotfiles_dir"
@@ -334,6 +354,7 @@ PACKAGE="maria-padilha"
 PACKAGE_VERSION="$pkgver"
 EOF
     overlay_dotfiles "$profile_work"
+    normalize_profile_modes "$profile_work"
 }
 
 build_iso() {
