@@ -345,7 +345,7 @@ else
         ok "installed greetd has no initial_session autologin"
     fi
     if [[ -s "$greetd_config" ]] && grep -qE '^\[default_session\]' "$greetd_config"; then
-        ok "installed greetd has a default tuigreet session"
+        ok "installed greetd has a default greeter session"
     else
         bad "installed greetd is missing [default_session]"
     fi

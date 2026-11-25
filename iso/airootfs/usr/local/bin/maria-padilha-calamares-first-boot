@@ -50,12 +50,10 @@ cat >/etc/greetd/config.toml <<'EOF'
 [terminal]
 vt = 1
 
-# The installed system has no autologin.  The wrapper lists the session entries
-# installed by the maria-padilha package, including Maria Padilha, and applies
-# the Maria Padilha tuigreet theme with a readable fallback when no generated
-# palette file is present.
+# The installed system has no autologin. The Quickshell greeter runs under
+# cage and falls back to the themed tuigreet wrapper if it cannot start.
 [default_session]
-command = "/usr/local/bin/maria-padilha-greeter --sessions /usr/share/wayland-sessions --greeting 'Maria Padilha'"
+command = "/usr/bin/padilha-greeter-qs"
 user = "greeter"
 EOF
 chmod 0644 /etc/greetd/config.toml

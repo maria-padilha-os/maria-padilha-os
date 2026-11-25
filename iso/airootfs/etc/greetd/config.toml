@@ -8,11 +8,9 @@ vt = 1
 command = "hyprland"
 user = "maria"
 
-# greetd + tuigreet is the single greeter supported by this profile.
-# Keep packages.x86_64, this file and the enabled unit in sync.  The wrapper
-# supplies the Maria Padilha --theme spec from boot-palette.conf, or from its
-# compiled-in fallback when that file is missing.  It never needs a user
-# session or a generated desktop palette to show a readable greeter.
+# The Quickshell greeter runs under cage. The wrapper falls back to the
+# themed tuigreet UI if cage or Quickshell cannot start, so a broken greeter
+# never leaves the machine at a dead login screen.
 [default_session]
-command = "/usr/local/bin/maria-padilha-greeter --sessions /usr/share/wayland-sessions --greeting 'Maria Padilha'"
+command = "/usr/bin/padilha-greeter-qs"
 user = "greeter"
