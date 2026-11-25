@@ -277,16 +277,16 @@ fi
 # ---------------------------------------------------------------------------
 # Greeter wiring and package selection
 # ---------------------------------------------------------------------------
-if grep -qF -- 'maria-padilha-greeter' iso/airootfs/etc/greetd/config.toml &&
-    grep -qF -- '--sessions /usr/share/wayland-sessions' iso/airootfs/etc/greetd/config.toml &&
-    grep -qF -- 'Maria Padilha' iso/airootfs/etc/greetd/config.toml; then
-    ok "greetd runs the themed wrapper with the Maria Padilha session"
+if grep -qF -- 'padilha-greeter-qs' iso/airootfs/etc/greetd/config.toml &&
+    grep -qx 'cage' iso/packages.x86_64 &&
+    grep -qx 'greetd-tuigreet' iso/packages.x86_64; then
+    ok "greetd runs the Quickshell greeter with the tuigreet fallback"
 else
-    bad "greetd is not wired to the themed greeter"
+    bad "greetd is not wired to the Quickshell greeter and fallback"
 fi
-if grep -qF -- 'maria-padilha-greeter' iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot &&
-    grep -qF -- '--sessions /usr/share/wayland-sessions' iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot; then
-    ok "Calamares installs the same themed greeter without autologin"
+if grep -qF -- 'padilha-greeter-qs' iso/airootfs/usr/local/bin/maria-padilha-calamares-first-boot &&
+    grep -qF -- 'padilha-greeter-qs' iso/airootfs/etc/greetd/config.toml; then
+    ok "Calamares installs the same Quickshell greeter without autologin"
 else
     bad "Calamares first-boot greeter config is stale"
 fi

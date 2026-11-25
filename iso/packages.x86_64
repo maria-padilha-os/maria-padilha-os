@@ -126,6 +126,7 @@ ttf-dejavu
 # Display manager: greetd + tuigreet (the only greeter this profile supports)
 greetd
 greetd-tuigreet
+cage
 
 # The desktop package, served from the local repository build.sh creates.
 maria-padilha
