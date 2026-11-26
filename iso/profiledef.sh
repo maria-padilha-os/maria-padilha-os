@@ -23,8 +23,11 @@ bootmodes=('bios.syslinux'
 airootfs_image_type="squashfs"
 airootfs_image_tool_options=('-comp' 'zstd' '-Xcompression-level' '15' '-b' '1M')
 # CI overrides this to add a serial console for the headless QEMU smoke boot.
-# Keep the default suitable for a normal desktop boot.
+# Keep the default suitable for a normal desktop boot. Newer mkarchiso reads
+# the per-architecture kernel_params_<arch> variable; keep kernel_params too so
+# older tooling and the static tests continue to see the same default.
 kernel_params="${MARIA_PADILHA_KERNEL_PARAMS:-quiet splash}"
+kernel_params_x86_64="$kernel_params"
 declare -A file_permissions=()
 file_permissions=(
   ["/etc/shadow"]="0:0:400"

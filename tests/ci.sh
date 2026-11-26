@@ -41,6 +41,28 @@ for script in "$build_script" "$container_script" "$smoke_script"; do
     fi
 done
 
+# build.sh parses `makepkg --printsrcinfo`, whose keys are tab-indented except
+# for pkgbase. A regression here silently skips depends/makedepends and the
+# package build fails on missing headers.
+srcinfo_fixture=$'\tpkgbase = maria-padilha\n\tdepends = qt6-base\n\tmakedepends = ninja\n'
+parsed_pkgbase="$(awk -F' = ' '{ sub(/^[[:space:]]+/, "", $1) } $1 == "pkgbase" { print $2; exit }' <<<"$srcinfo_fixture")"
+mapfile -t parsed_deps < <(awk -F' = ' '{ sub(/^[[:space:]]+/, "", $1) } $1 == "depends" || $1 == "makedepends" { print $2 }' <<<"$srcinfo_fixture")
+if [[ "$parsed_pkgbase" == "maria-padilha" && "${parsed_deps[*]}" == "qt6-base ninja" ]]; then
+    ok "build.sh parses indented SRCINFO keys"
+else
+    bad "build.sh does not parse indented SRCINFO keys"
+fi
+if grep -qF 'qt6-shadertools' "$root/build.sh"; then
+    ok "build.sh installs the Qt6 ShaderTools build dependency"
+else
+    bad "build.sh is missing the Qt6 ShaderTools build dependency"
+fi
+if grep -qF 'normalize_profile_modes' "$root/build.sh"; then
+    ok "build.sh normalises staged profile modes"
+else
+    bad "build.sh does not normalise staged profile modes"
+fi
+
 # Workflow shape: an Arch container build, checksum, artifacts and an explicit
 # opt-in QEMU job.  It must not publish a release.
 if grep -q '^  workflow_dispatch:' "$workflow" &&
@@ -60,8 +82,9 @@ else
 fi
 if grep -qF 'container-build.sh' "$build_script" &&
     grep -qF 'MARIA_PADILHA_EXTRA_REPO' "$root/build.sh" &&
-    grep -qF 'libcava' "$container_script"; then
-    ok "container bootstrap provides the AUR-only libcava dependency to the ISO repo"
+    grep -qF 'libcava' "$container_script" &&
+    grep -qF 'calamares' "$container_script"; then
+    ok "container bootstrap provides the AUR-only libcava and calamares packages to the ISO repo"
 else
     bad "AUR-only package bootstrap is missing from the CI build path"
 fi
@@ -135,6 +158,7 @@ else
 fi
 if grep -qF 'MARIA_PADILHA_KERNEL_PARAMS' "$root/iso/profiledef.sh" &&
     grep -qE '^kernel_params=.*splash' "$root/iso/profiledef.sh" &&
+    grep -qE '^kernel_params_x86_64=.*kernel_params' "$root/iso/profiledef.sh" &&
     grep -qF 'systemd.wants=serial-getty@ttyS0.service' "$workflow"; then
     ok "CI serial kernel parameters are opt-in and leave the normal default intact"
 else

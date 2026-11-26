@@ -58,14 +58,19 @@ invoking user after the privileged container exits. It never runs `sudo` on the
 host.
 
 The desktop PKGBUILD currently declares `libcava`, which is an AUR package, not
-an official Arch package. Inside the container,
-`scripts/ci/container-build.sh` builds that one AUR package with `makepkg`,
-installs it for the `maria-padilha` build, and passes its package archive to
-`build.sh` through `MARIA_PADILHA_EXTRA_REPO`. `build.sh` adds it to the
-ISO-local `[maria-padilha]` repository so `mkarchiso` can resolve the dependency
-inside the live root. The AUR branch is skipped automatically if `libcava`
-becomes available in the official repositories. No AUR helper is installed and
-the AUR source/package is not cached.
+an official Arch package, and the pinned CMake project also needs Qt6
+ShaderTools headers that are not in its `makedepends`; `build.sh` installs the
+missing header package. The current Arch snapshot also no longer packages
+`calamares` in the official repositories. Inside the container,
+`scripts/ci/container-build.sh` builds `libcava` and `calamares` with
+`makepkg`, installs `libcava` for the `maria-padilha` build, and passes their
+package archives to `build.sh` through `MARIA_PADILHA_EXTRA_REPO`. The AUR
+Calamares recipe is built with `packagechooser` kept enabled because the Maria
+Padilha settings require that module. `build.sh` adds both packages to the
+ISO-local `[maria-padilha]` repository so `mkarchiso` can resolve the
+dependencies inside the live root. Each AUR branch is skipped automatically if
+the package becomes available in the official repositories. No AUR helper is
+installed and the AUR source/packages are not cached.
 
 ## Package download cache
 
